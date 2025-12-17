@@ -10,7 +10,6 @@
       --text:#e9eef7;
       --muted:#9fb0c8;
       --line: rgba(255,255,255,.12);
-      --panel: rgba(18,26,39,.55);
       --shadow: 0 18px 55px rgba(0,0,0,.45);
       --radius: 18px;
 
@@ -19,6 +18,9 @@
 
       --cellBg1: rgba(255,255,255,.07);
       --cellBg2: rgba(0,0,0,.15);
+
+      --glow: rgba(74,163,255,.38);
+      --glow2: rgba(255,255,255,.10);
     }
     *{box-sizing:border-box}
     body{
@@ -83,7 +85,7 @@
       margin-bottom:14px;
     }
     .status .mini{color:var(--muted);font-size:12px}
-    .status strong{font-weight:850}
+    .status strong{font-weight:900}
     .pill{
       font-size:12px;
       padding:6px 10px;
@@ -108,13 +110,33 @@
       place-items:center;
       position:relative;
     }
+
+    /* 2D overlay for win-line (robust with perspective/rotate/explode) */
+    .overlay{
+      position:absolute;
+      inset: 0;
+      pointer-events:none;
+      z-index: 50;
+      overflow: visible;
+    }
+    .overlay line{
+      stroke: rgba(255,255,255,.85);
+      stroke-width: 4;
+      stroke-linecap: round;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.65));
+    }
+    .overlay .dot{
+      fill: rgba(255,255,255,.92);
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.65));
+    }
+
     .cube{
       width: 100%;
       height: 100%;
       position:relative;
       transform-style: preserve-3d;
       transform: rotateX(var(--rx, 18deg)) rotateY(var(--ry, -22deg));
-      transition: transform .25s ease;
+      transition: transform .18s ease;
       filter: drop-shadow(0 26px 60px rgba(0,0,0,.55));
     }
 
@@ -147,7 +169,20 @@
       display:grid;
       place-items:center;
       overflow:hidden;
+      transition: filter .12s ease, opacity .12s ease, border-color .12s ease;
     }
+
+    /* highlight hovered/active level */
+    .layer.focus{
+      border-color: rgba(74,163,255,.55);
+      filter: brightness(1.06);
+      box-shadow: 0 0 0 2px rgba(74,163,255,.12) inset;
+    }
+    .layer.dim{
+      opacity: .62;
+      filter: brightness(.92);
+    }
+
     .layer .layerLabel{
       position:absolute;
       top:10px;
@@ -184,7 +219,7 @@
       display:grid;
       place-items:center;
       font-size: clamp(26px, 4.3vw, 44px);
-      font-weight: 900;
+      font-weight: 950;
       letter-spacing: 1px;
       transform-style: preserve-3d;
       box-shadow:
@@ -220,7 +255,7 @@
         0 14px 30px rgba(0,0,0,.38),
         0 0 0 2px rgba(255,255,255,.10),
         inset 0 1px 0 rgba(255,255,255,.14);
-      filter: brightness(1.08);
+      filter: brightness(1.10);
       opacity: 1;
     }
 
@@ -238,7 +273,7 @@
       padding: 11px 12px;
       border-radius: 14px;
       cursor:pointer;
-      font-weight: 850;
+      font-weight: 900;
       transition: transform .06s ease, background .2s ease, border-color .2s ease;
     }
     .btn:hover{border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06)}
@@ -252,7 +287,7 @@
       font-size: 14px;
       letter-spacing:.2px;
       color: var(--muted);
-      font-weight: 900;
+      font-weight: 950;
       text-transform: uppercase;
     }
     .row{
@@ -264,7 +299,7 @@
       margin-bottom: 10px;
     }
     .row:last-child{margin-bottom:0}
-    label{font-size:13px;font-weight:900}
+    label{font-size:13px;font-weight:950}
     input[type="range"]{ width: 200px; }
     .toggle{
       display:flex; align-items:center; gap:10px;
@@ -323,13 +358,20 @@
         <div class="status" aria-live="polite">
           <div>
             <div class="mini">Stato</div>
-            <div id="statusText"><strong>Tocca una casella</strong></div>
+            <div id="statusText"><strong>Tocca a X.</strong></div>
+            <div class="mini" id="lineInfo" style="margin-top:4px; display:none;"></div>
           </div>
           <div class="pill" id="turnPill">Turno: X</div>
         </div>
 
         <div class="stage">
-          <div class="perspective">
+          <div class="perspective" id="perspective">
+            <svg class="overlay" id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <line id="winLine" x1="0" y1="0" x2="0" y2="0" style="display:none;"></line>
+              <circle id="winDotA" class="dot" r="5" cx="0" cy="0" style="display:none;"></circle>
+              <circle id="winDotB" class="dot" r="5" cx="0" cy="0" style="display:none;"></circle>
+            </svg>
+
             <div class="cube" id="cube">
               <div class="platform"></div>
               <!-- layers injected -->
@@ -351,7 +393,7 @@
           <h1>Vista</h1>
           <div class="sub">Ruota il “cubo” e separa i livelli.</div>
         </div>
-        <div class="badge" id="viewBadge">3D</div>
+        <div class="badge">3D</div>
       </div>
 
       <div class="section">
@@ -373,7 +415,7 @@
               <div class="knob"></div>
             </div>
             <div>
-              <div style="font-weight:900;font-size:13px">Esplodi livelli</div>
+              <div style="font-weight:950;font-size:13px">Esplodi livelli</div>
               <div class="mini">Separa Z=0..3 per leggere meglio</div>
             </div>
           </div>
@@ -394,7 +436,7 @@
         <div class="hint">
           • Ogni casella è <b>(x,y,z)</b> con x,y,z da 0 a 3.<br/>
           • Vittoria: 4 uguali in una linea (qualunque direzione).<br/>
-          • Vuoi anche la modalità <b>CPU</b> o <b>online</b>? La aggiungiamo.
+          • Hover: evidenzia il livello Z per orientarti.
         </div>
       </div>
     </div>
@@ -412,10 +454,21 @@
 
   let score = { X:0, O:0 };
 
+  // focus/hover layer
+  let hoverZ = null;
+  let pinnedZ = null;
+
   // UI refs
   const cube = document.getElementById('cube');
+  const perspective = document.getElementById('perspective');
+  const overlay = document.getElementById('overlay');
+  const winLineEl = document.getElementById('winLine');
+  const winDotA = document.getElementById('winDotA');
+  const winDotB = document.getElementById('winDotB');
+
   const statusText = document.getElementById('statusText');
   const turnPill = document.getElementById('turnPill');
+  const lineInfo = document.getElementById('lineInfo');
 
   const resetBtn = document.getElementById('resetBtn');
   const resetScoreBtn = document.getElementById('resetScoreBtn');
@@ -433,20 +486,26 @@
 
   // ---------- helpers ----------
   const idx = (x,y,z) => z*N*N + y*N + x;
+  const toXYZ = (i) => {
+    const z = Math.floor(i / (N*N));
+    const r = i % (N*N);
+    const y = Math.floor(r / N);
+    const x = r % N;
+    return {x,y,z};
+  };
   const inBounds = (x,y,z) => x>=0 && x<N && y>=0 && y<N && z>=0 && z<N;
 
   function setStatus(msg, strong=false){
     statusText.innerHTML = strong ? `<strong>${msg}</strong>` : msg;
   }
-
   function updateScores(){
     scoreX.textContent = score.X;
     scoreO.textContent = score.O;
   }
-
   function updateCubeRotation(){
     cube.style.setProperty('--rx', rx.value + 'deg');
     cube.style.setProperty('--ry', ry.value + 'deg');
+    requestAnimationFrame(updateWinOverlay);
   }
 
   // Generate ALL unique winning lines of length N in NxNxN
@@ -456,13 +515,8 @@
       for (let dy=-1; dy<=1; dy++){
         for (let dz=-1; dz<=1; dz++){
           if (dx===0 && dy===0 && dz===0) continue;
-
-          // Canonical direction to avoid duplicates:
-          // Keep only directions where the first non-zero component is positive.
-          // (lexicographic)
           const firstNonZero = (dx!==0) ? dx : (dy!==0 ? dy : dz);
-          if (firstNonZero < 0) continue;
-
+          if (firstNonZero < 0) continue; // canonical
           dirs.push([dx,dy,dz]);
         }
       }
@@ -475,7 +529,6 @@
       for (let y=0; y<n; y++){
         for (let x=0; x<n; x++){
           for (const [dx,dy,dz] of dirs){
-            // build line starting at (x,y,z)
             const coords = [];
             let ok = true;
             for (let k=0; k<n; k++){
@@ -487,11 +540,8 @@
             }
             if (!ok) continue;
 
-            // Ensure this is the minimal start for this direction (avoid same line shifted)
-            const px = x - dx;
-            const py = y - dy;
-            const pz = z - dz;
-            if (inBounds(px,py,pz)) continue;
+            // minimal start for this direction
+            if (inBounds(x-dx, y-dy, z-dz)) continue;
 
             const key = coords.join(',');
             if (!set.has(key)){
@@ -509,20 +559,38 @@
   linesBadge.textContent = `Linee vincenti: ${WIN_LINES.length}`;
 
   // ---------- rendering ----------
+  let winSet = null;
+  let winLine = null; // array of indices (length 4)
+
   function clearLayers(){
-    // remove existing .layer nodes (keep .platform)
     [...cube.querySelectorAll('.layer')].forEach(n => n.remove());
+  }
+
+  function applyLayerFocus(){
+    const layers = [...cube.querySelectorAll('.layer')];
+    const z = (hoverZ !== null) ? hoverZ : pinnedZ;
+
+    layers.forEach(layer => {
+      const layerZ = Number(layer.getAttribute('data-z'));
+      layer.classList.remove('focus','dim');
+
+      if (z === null) return;
+
+      if (layerZ === z) layer.classList.add('focus');
+      else layer.classList.add('dim');
+    });
   }
 
   function render(){
     clearLayers();
 
     const exploded = explodeSwitch.classList.contains('on');
-    const zGap = exploded ? 70 : 24; // px depth spacing
+    const zGap = exploded ? 110 : 26; // + leggibilità quando ON
 
     for (let z=0; z<N; z++){
       const layer = document.createElement('div');
       layer.className = 'layer';
+      layer.setAttribute('data-z', String(z));
       layer.style.transform = `translateZ(${(z - (N-1)/2) * zGap}px)`;
 
       const label = document.createElement('div');
@@ -539,6 +607,8 @@
           const btn = document.createElement('button');
           btn.className = 'cell';
           btn.type = 'button';
+          btn.dataset.index = String(i);
+          btn.dataset.z = String(z);
           btn.setAttribute('aria-label', `Casella x${x} y${y} z${z}`);
 
           const v = board[i];
@@ -553,10 +623,20 @@
             btn.disabled = gameOver;
           }
 
-          // win highlight
           if (winSet && winSet.has(i)) btn.classList.add('win');
 
-          btn.addEventListener('click', () => play(i));
+          // Hover focus level
+          btn.addEventListener('mouseenter', () => {
+            hoverZ = Number(btn.dataset.z);
+            applyLayerFocus();
+          });
+          btn.addEventListener('mouseleave', () => {
+            hoverZ = null;
+            applyLayerFocus();
+          });
+
+          // Click
+          btn.addEventListener('click', () => play(i, z));
           grid.appendChild(btn);
         }
       }
@@ -567,11 +647,63 @@
 
     turnPill.textContent = `Turno: ${current}`;
     explodeBadge.textContent = exploded ? 'ON' : 'OFF';
+
+    applyLayerFocus();
+    requestAnimationFrame(updateWinOverlay);
+  }
+
+  // ---------- win overlay ----------
+  function hideWinOverlay(){
+    winLineEl.style.display = 'none';
+    winDotA.style.display = 'none';
+    winDotB.style.display = 'none';
+  }
+
+  function setOverlayViewBox(){
+    const r = perspective.getBoundingClientRect();
+    overlay.setAttribute('viewBox', `0 0 ${Math.max(1, r.width)} ${Math.max(1, r.height)}`);
+  }
+
+  function centerOfElement(el){
+    const pr = perspective.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return {
+      x: (r.left - pr.left) + r.width/2,
+      y: (r.top - pr.top) + r.height/2
+    };
+  }
+
+  function updateWinOverlay(){
+    setOverlayViewBox();
+    if (!winLine || winLine.length < 2) { hideWinOverlay(); return; }
+
+    const aIdx = winLine[0];
+    const bIdx = winLine[winLine.length - 1];
+
+    const aEl = cube.querySelector(`.cell[data-index="${aIdx}"]`);
+    const bEl = cube.querySelector(`.cell[data-index="${bIdx}"]`);
+
+    if (!aEl || !bEl) { hideWinOverlay(); return; }
+
+    const A = centerOfElement(aEl);
+    const B = centerOfElement(bEl);
+
+    winLineEl.setAttribute('x1', A.x);
+    winLineEl.setAttribute('y1', A.y);
+    winLineEl.setAttribute('x2', B.x);
+    winLineEl.setAttribute('y2', B.y);
+    winLineEl.style.display = '';
+
+    winDotA.setAttribute('cx', A.x);
+    winDotA.setAttribute('cy', A.y);
+    winDotA.style.display = '';
+
+    winDotB.setAttribute('cx', B.x);
+    winDotB.setAttribute('cy', B.y);
+    winDotB.style.display = '';
   }
 
   // ---------- game logic ----------
-  let winSet = null;
-
   function checkWinner(){
     for (const line of WIN_LINES){
       const a = board[line[0]];
@@ -580,13 +712,21 @@
       for (let k=1; k<line.length; k++){
         if (board[line[k]] !== a){ ok=false; break; }
       }
-      if (ok){
-        return { winner: a, line };
-      }
+      if (ok) return { winner: a, line };
     }
-    // draw if full
     if (board.every(v => v)) return { winner: 'D', line: null };
     return { winner: null, line: null };
+  }
+
+  function lineDirectionInfo(line){
+    // line is array of indices (length 4)
+    const p0 = toXYZ(line[0]);
+    const p1 = toXYZ(line[1]);
+    const p3 = toXYZ(line[3]);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dz = p1.z - p0.z;
+    return { p0, p3, dx, dy, dz };
   }
 
   function endGame(res){
@@ -594,21 +734,38 @@
 
     if (res.winner === 'D'){
       setStatus('Pareggio (griglia piena).', true);
+      lineInfo.style.display = 'none';
       winSet = null;
+      winLine = null;
+      hideWinOverlay();
     } else {
       score[res.winner]++;
       updateScores();
       setStatus(`Vince ${res.winner}! (4 in linea)`, true);
+
       winSet = new Set(res.line);
+      winLine = res.line.slice();
+
+      const info = lineDirectionInfo(winLine);
+      lineInfo.style.display = '';
+      lineInfo.textContent =
+        `Linea: (${info.p0.x},${info.p0.y},${info.p0.z}) → (${info.p3.x},${info.p3.y},${info.p3.z})  dir (${info.dx},${info.dy},${info.dz})`;
+
+      // auto focus sul livello del primo punto (utile quando non esploso)
+      pinnedZ = info.p0.z;
     }
+
     render();
   }
 
-  function play(i){
+  function play(i, zClicked){
     if (gameOver) return;
     if (board[i]) return;
 
     board[i] = current;
+
+    // Pin del livello appena giocato (così “capisci dove sei”)
+    pinnedZ = zClicked;
 
     const res = checkWinner();
     if (res.winner){
@@ -618,7 +775,13 @@
 
     current = (current === 'X') ? 'O' : 'X';
     setStatus(`Tocca a ${current}.`, true);
+
+    // clear win visuals
     winSet = null;
+    winLine = null;
+    lineInfo.style.display = 'none';
+    hideWinOverlay();
+
     render();
   }
 
@@ -627,6 +790,12 @@
     current = 'X';
     gameOver = false;
     winSet = null;
+    winLine = null;
+    hoverZ = null;
+    pinnedZ = null;
+    lineInfo.style.display = 'none';
+    hideWinOverlay();
+
     setStatus('Tocca a X. (Obiettivo: 4 in linea)', true);
     render();
   }
@@ -651,6 +820,9 @@
     updateScores();
     newGame();
   });
+
+  // keep overlay accurate
+  window.addEventListener('resize', () => requestAnimationFrame(updateWinOverlay));
 
   // ---------- init ----------
   updateScores();
