@@ -3,23 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tris 3D vero (4×4×4) — WebGL</title>
-
+  <title>Tris 3D vero — 4×4×4 (WebGL2 self-contained)</title>
   <style>
     :root{
-      --bg:#070a10;
-      --text:#e9eef7;
-      --muted:#9fb0c8;
-      --line: rgba(255,255,255,.12);
-      --panel: rgba(18,26,39,.55);
-      --shadow: 0 18px 55px rgba(0,0,0,.45);
-      --radius: 18px;
+      --bg:#070a10; --text:#e9eef7; --muted:#9fb0c8; --line: rgba(255,255,255,.12);
+      --panel: rgba(18,26,39,.55); --shadow: 0 18px 55px rgba(0,0,0,.45); --radius: 18px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       color: var(--text);
       background:
         radial-gradient(1100px 700px at 20% 10%, rgba(74,163,255,.18), transparent 55%),
@@ -28,188 +21,70 @@
         var(--bg);
       overflow:hidden;
     }
-    .app{
-      height:100%;
-      display:grid;
-      grid-template-columns: 1.25fr .75fr;
-      gap:18px;
-      padding:18px;
-    }
-    @media (max-width: 1000px){
-      body{overflow:auto}
-      .app{grid-template-columns: 1fr; height:auto;}
-      #viewport{height:60vh;}
-    }
+    .app{height:100%;display:grid;grid-template-columns:1.25fr .75fr;gap:18px;padding:18px;}
+    @media (max-width: 1000px){ body{overflow:auto} .app{grid-template-columns:1fr;height:auto;} #viewport{height:60vh;} }
     .panel{
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
+      border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden;
       background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
       backdrop-filter: blur(10px);
     }
     .hdr{
-      padding:18px 18px 12px;
-      border-bottom:1px solid var(--line);
-      background: var(--panel);
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
+      padding:18px 18px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
     }
     h1{margin:0;font-size:18px;letter-spacing:.2px}
     .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.35}
-    .badge{
-      font-size:12px;
-      color:var(--muted);
-      border:1px solid var(--line);
-      padding:6px 10px;
-      border-radius:999px;
-      background: rgba(0,0,0,.18);
-      white-space:nowrap;
-    }
+    .badge{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.18);white-space:nowrap;}
     .content{padding:18px}
     .status{
-      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-      padding:12px 14px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background: rgba(0,0,0,.18);
-      margin-bottom:14px;
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+      padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.18);margin-bottom:14px;
     }
     .status .mini{color:var(--muted);font-size:12px}
-    .status strong{font-weight:950}
-    .pill{
-      font-size:12px;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      color:var(--muted);
-      background: rgba(255,255,255,.03);
-      user-select:none;
-      align-self:flex-start;
-    }
-    #viewport{
-      width:100%;
-      flex:1;
-      min-height: 520px;
-      position:relative;
-      overflow:hidden;
-      border-top: 1px solid rgba(255,255,255,.06);
-    }
-    .hud{
-      position:absolute;
-      left: 12px;
-      bottom: 12px;
-      background: rgba(0,0,0,.28);
-      border: 1px solid rgba(255,255,255,.10);
-      color: rgba(255,255,255,.88);
-      padding: 10px 12px;
-      border-radius: 14px;
-      font-size: 12px;
-      backdrop-filter: blur(8px);
-      pointer-events:none;
-      z-index:5;
-    }
-    .controls{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .btn{
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      padding: 11px 12px;
-      border-radius: 14px;
-      cursor:pointer;
-      font-weight: 950;
-    }
+    .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.03);user-select:none;align-self:flex-start;}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+    .btn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);padding:11px 12px;border-radius:14px;cursor:pointer;font-weight:950;}
     .btn.primary{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14)}
     .btn.danger{border-color: rgba(255,74,106,.35); background: rgba(255,74,106,.10)}
-
-    .section{padding:16px 18px; border-top:1px solid var(--line)}
-    .section h2{
-      margin:0 0 10px;
-      font-size: 14px;
-      letter-spacing:.2px;
-      color: var(--muted);
-      font-weight: 950;
-      text-transform: uppercase;
+    #viewport{
+      width:100%; flex:1; min-height:520px; position:relative; overflow:hidden;
+      border-top:1px solid rgba(255,255,255,.06);
+      background: radial-gradient(700px 500px at 40% 15%, rgba(255,255,255,.05), transparent 60%);
     }
+    canvas{display:block;width:100%;height:100%}
+    .hud{
+      position:absolute; left:12px; bottom:12px; z-index:6; pointer-events:none;
+      background: rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.10);
+      color: rgba(255,255,255,.88); padding:10px 12px; border-radius:14px; font-size:12px; backdrop-filter: blur(8px);
+    }
+    .section{padding:16px 18px;border-top:1px solid var(--line)}
+    .section h2{margin:0 0 10px;font-size:14px;letter-spacing:.2px;color:var(--muted);font-weight:950;text-transform:uppercase;}
     .row{
-      display:flex; align-items:center; justify-content:space-between; gap:12px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,.16);
-      margin-bottom: 10px;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(0,0,0,.16);margin-bottom:10px;
     }
     label{font-size:13px;font-weight:950}
-    input[type="range"]{ width: 200px; }
-
-    .toggle{display:flex; align-items:center; gap:10px; user-select:none;}
-    .switch{
-      width: 46px; height: 26px;
-      border-radius: 999px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-      position:relative;
-      cursor:pointer;
-      flex: 0 0 auto;
-    }
-    .knob{
-      width: 20px; height: 20px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.75);
-      position:absolute;
-      top: 2px; left: 2px;
-      transition: left .18s ease;
-    }
-    .switch.on{ border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14); }
-    .switch.on .knob{ left: 24px; }
-
-    .zbar{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
-    .zbtn{
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      padding: 8px 10px;
-      border-radius: 12px;
-      cursor:pointer;
-      font-weight: 950;
-      font-size: 12px;
-      user-select:none;
-    }
-    .zbtn.active{
-      border-color: rgba(74,163,255,.45);
-      background: rgba(74,163,255,.16);
-    }
-    select{
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      border: 1px solid rgba(255,255,255,.14);
-      padding: 8px 10px;
-      border-radius: 12px;
-      font-weight: 900;
-      cursor:pointer;
-      min-width: 180px;
-    }
-    .score{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .card{
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: rgba(0,0,0,.16);
-      padding: 12px;
-    }
+    input[type="range"]{width:200px}
+    .toggle{display:flex;align-items:center;gap:10px;user-select:none;}
+    .switch{width:46px;height:26px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);position:relative;cursor:pointer;flex:0 0 auto;}
+    .knob{width:20px;height:20px;border-radius:999px;background:rgba(255,255,255,.75);position:absolute;top:2px;left:2px;transition:left .18s ease, background .18s ease;}
+    .switch.on{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14);}
+    .switch.on .knob{left:24px;background: rgba(255,255,255,.92);}
+    .zbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+    .zbtn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:950;font-size:12px;user-select:none;}
+    .zbtn.active{border-color: rgba(74,163,255,.45); background: rgba(74,163,255,.16);}
+    select{background:rgba(255,255,255,.04);color:var(--text);border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:12px;font-weight:900;cursor:pointer;min-width:180px;}
+    .score{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .card{border:1px solid var(--line);border-radius:16px;background:rgba(0,0,0,.16);padding:12px;}
     .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
     .v{font-size:22px;font-weight:950}
-    .hint{font-size:13px;color:var(--muted);line-height:1.5}
+    .hint{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+    .overlay2d{position:absolute; inset:0; pointer-events:none; z-index:5;}
+    .mark{position:absolute; transform:translate(-50%,-50%); font-weight:950; font-size:30px; text-shadow: 0 10px 20px rgba(0,0,0,.6); opacity:.98; user-select:none;}
+    .mark.x{color:#4aa3ff} .mark.o{color:#44d19e}
+    .errorbox{position:absolute; inset:0; display:none; place-items:center; z-index:50; background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px;}
+    .errorcard{width:min(720px,100%); border:1px solid rgba(255,255,255,.14); border-radius:18px; background: rgba(10,14,22,.72); padding:16px; box-shadow: var(--shadow);}
+    .errorcard pre{white-space:pre-wrap;color: rgba(255,255,255,.85);background: rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;margin:10px 0 0;font-size:12px;line-height:1.4;}
   </style>
 </head>
 <body>
@@ -218,8 +93,8 @@
     <div class="panel" style="display:flex; flex-direction:column;">
       <div class="hdr">
         <div>
-          <h1>Tris 3D vero — 4×4×4 (WebGL)</h1>
-          <div class="sub">Cubo reale nello spazio: ruota/zoom, clicca i cubetti. 4 in linea in qualunque direzione.</div>
+          <h1>Tris 3D vero — 4×4×4 (WebGL2)</h1>
+          <div class="sub">Self-contained: nessuna libreria esterna. Ruota/zoom e clicca i cubetti. 4 in linea in qualunque direzione.</div>
         </div>
         <div class="badge" id="linesBadge">Linee: …</div>
       </div>
@@ -241,7 +116,17 @@
       </div>
 
       <div id="viewport">
+        <canvas id="gl"></canvas>
+        <div class="overlay2d" id="overlay2d"></div>
         <div class="hud">Drag = ruota • Scroll = zoom • Shift+Drag = pan • Hover = preview (se ON)</div>
+
+        <div class="errorbox" id="errorbox">
+          <div class="errorcard">
+            <h3 style="margin:0 0 6px">WebGL non avviato</h3>
+            <div class="hint">Se vedi questo, il contesto WebGL2 non è stato creato oppure shader/driver bloccati.</div>
+            <pre id="errortext"></pre>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -260,17 +145,15 @@
 
         <div class="row">
           <label for="zDepth">Profondità Z</label>
-          <input id="zDepth" type="range" min="0.6" max="2.2" step="0.01" value="1.0" />
+          <input id="zDepth" type="range" min="0.7" max="2.2" step="0.01" value="1.0" />
         </div>
 
         <div class="row">
           <div class="toggle">
-            <div class="switch" id="explodeSwitch" role="switch" aria-checked="false" tabindex="0">
-              <div class="knob"></div>
-            </div>
+            <div class="switch" id="explodeSwitch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
             <div>
               <div style="font-weight:950;font-size:13px">Esplodi livelli</div>
-              <div class="hint" style="margin:0">Aumenta spacing tra Z0..Z3</div>
+              <p class="hint">Aumenta spacing tra Z0..Z3</p>
             </div>
           </div>
           <div class="badge" id="explodeBadge">OFF</div>
@@ -282,7 +165,7 @@
         <div class="row" style="align-items:flex-start;">
           <div>
             <div style="font-weight:950;font-size:13px">Selettore livello</div>
-            <div class="hint" style="margin:0">In Z0..Z3 puoi cliccare solo su quel piano</div>
+            <p class="hint">In Z0..Z3 puoi cliccare solo su quel piano</p>
           </div>
           <div class="zbar" id="zbar"></div>
         </div>
@@ -290,15 +173,12 @@
 
       <div class="section">
         <h2>CPU</h2>
-
         <div class="row">
           <div class="toggle">
-            <div class="switch" id="cpuSwitch" role="switch" aria-checked="false" tabindex="0">
-              <div class="knob"></div>
-            </div>
+            <div class="switch" id="cpuSwitch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
             <div>
               <div style="font-weight:950;font-size:13px">Vs CPU</div>
-              <div class="hint" style="margin:0">La CPU gioca con <b>O</b></div>
+              <p class="hint">La CPU gioca con <b>O</b></p>
             </div>
           </div>
           <div class="badge" id="cpuBadge">OFF</div>
@@ -316,15 +196,12 @@
 
       <div class="section">
         <h2>Didattica</h2>
-
         <div class="row">
           <div class="toggle">
-            <div class="switch on" id="teachSwitch" role="switch" aria-checked="true" tabindex="0">
-              <div class="knob"></div>
-            </div>
+            <div class="switch on" id="teachSwitch" role="switch" aria-checked="true" tabindex="0"><div class="knob"></div></div>
             <div>
               <div style="font-weight:950;font-size:13px">Preview linee</div>
-              <div class="hint" style="margin:0">Hover su cubetto vuoto: mostra linee possibili</div>
+              <p class="hint">Hover su cubetto vuoto: mostra linee possibili</p>
             </div>
           </div>
           <div class="badge" id="teachBadge">ON</div>
@@ -340,553 +217,202 @@
       </div>
     </div>
   </div>
-    <script type="module">
-    // ✅ MODULI STABILI (OrbitControls qui funziona davvero)
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+  <script>
+(() => {
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function showError(msg){
+    document.getElementById('errortext').textContent = msg;
+    document.getElementById('errorbox').style.display = 'grid';
+  }
 
-    const N = 4;
-    const SIZE = N*N*N;
+  // ===== DOM =====
+  const linesBadge = document.getElementById('linesBadge');
+  const statusText = document.getElementById('statusText');
+  const turnPill = document.getElementById('turnPill');
+  const lineInfo = document.getElementById('lineInfo');
+  const resetBtn = document.getElementById('resetBtn');
+  const resetScoreBtn = document.getElementById('resetScoreBtn');
+  const zDepth = document.getElementById('zDepth');
+  const explodeSwitch = document.getElementById('explodeSwitch');
+  const explodeBadge = document.getElementById('explodeBadge');
+  const cpuSwitch = document.getElementById('cpuSwitch');
+  const cpuBadge = document.getElementById('cpuBadge');
+  const cpuLevelSel = document.getElementById('cpuLevel');
+  const teachSwitch = document.getElementById('teachSwitch');
+  const teachBadge = document.getElementById('teachBadge');
+  const zbar = document.getElementById('zbar');
+  const scoreXEl = document.getElementById('scoreX');
+  const scoreOEl = document.getElementById('scoreO');
+  const overlay2d = document.getElementById('overlay2d');
 
-    // UI refs
-    const viewport = document.getElementById('viewport');
-    const statusText = document.getElementById('statusText');
-    const turnPill = document.getElementById('turnPill');
-    const lineInfo = document.getElementById('lineInfo');
-    const linesBadge = document.getElementById('linesBadge');
+  function setStatus(msg){ statusText.innerHTML = `<strong>${msg}</strong>`; }
+  function updateTurn(){ turnPill.textContent = `Turno: ${current}`; }
+  function updateScores(){ scoreXEl.textContent=score.X; scoreOEl.textContent=score.O; }
 
-    const resetBtn = document.getElementById('resetBtn');
-    const resetScoreBtn = document.getElementById('resetScoreBtn');
+  function toggleSwitch(el, forced){
+    if(forced===undefined) el.classList.toggle('on');
+    else el.classList.toggle('on', !!forced);
+    el.setAttribute('aria-checked', el.classList.contains('on')?'true':'false');
+    return el.classList.contains('on');
+  }
 
-    const explodeSwitch = document.getElementById('explodeSwitch');
-    const explodeBadge = document.getElementById('explodeBadge');
-    const zDepth = document.getElementById('zDepth');
+  // ===== GAME =====
+  const N=4, SIZE=N*N*N;
+  const idx=(x,y,z)=>z*N*N + y*N + x;
+  const toXYZ=(i)=>{
+    const z=Math.floor(i/(N*N));
+    const r=i%(N*N);
+    const y=Math.floor(r/N);
+    const x=r%N;
+    return {x,y,z};
+  };
+  const inBounds=(x,y,z)=>x>=0&&x<N&&y>=0&&y<N&&z>=0&&z<N;
 
-    const cpuSwitch = document.getElementById('cpuSwitch');
-    const cpuBadge = document.getElementById('cpuBadge');
-    const cpuLevelSel = document.getElementById('cpuLevel');
-
-    const teachSwitch = document.getElementById('teachSwitch');
-    const teachBadge = document.getElementById('teachBadge');
-
-    const zbar = document.getElementById('zbar');
-    const scoreXEl = document.getElementById('scoreX');
-    const scoreOEl = document.getElementById('scoreO');
-
-    // State
-    let board = Array(SIZE).fill(null);
-    let current = 'X';
-    let gameOver = false;
-
-    let vsCPU = false;
-    let cpuLevel = 'normal';
-    let teach = true;
-
-    let explode = false;
-    let zScale = 1.0;
-    let planeZ = null;
-
-    let score = { X:0, O:0 };
-
-    // Helpers
-    const idx = (x,y,z) => z*N*N + y*N + x;
-    const toXYZ = (i) => {
-      const z = Math.floor(i / (N*N));
-      const r = i % (N*N);
-      const y = Math.floor(r / N);
-      const x = r % N;
-      return {x,y,z};
-    };
-    const inBounds = (x,y,z) => x>=0 && x<N && y>=0 && y<N && z>=0 && z<N;
-
-    function setStatus(msg){ statusText.innerHTML = `<strong>${msg}</strong>`; }
-    function updateTurn(){ turnPill.textContent = `Turno: ${current}`; }
-    function updateScores(){ scoreXEl.textContent = score.X; scoreOEl.textContent = score.O; }
-
-    // Winning lines
-    function generateLines(n){
-      const dirs = [];
-      for (let dx=-1; dx<=1; dx++){
-        for (let dy=-1; dy<=1; dy++){
-          for (let dz=-1; dz<=1; dz++){
-            if (dx===0 && dy===0 && dz===0) continue;
-            const firstNonZero = (dx!==0) ? dx : (dy!==0 ? dy : dz);
-            if (firstNonZero < 0) continue;
-            dirs.push([dx,dy,dz]);
-          }
+  function generateLines(n){
+    const dirs=[];
+    for(let dx=-1;dx<=1;dx++)
+      for(let dy=-1;dy<=1;dy++)
+        for(let dz=-1;dz<=1;dz++){
+          if(dx===0&&dy===0&&dz===0) continue;
+          const firstNonZero=(dx!==0)?dx:(dy!==0?dy:dz);
+          if(firstNonZero<0) continue;
+          dirs.push([dx,dy,dz]);
         }
-      }
-      const set = new Set();
-      const lines = [];
-      for (let z=0; z<n; z++){
-        for (let y=0; y<n; y++){
-          for (let x=0; x<n; x++){
-            for (const [dx,dy,dz] of dirs){
-              const coords = [];
-              let ok = true;
-              for (let k=0; k<n; k++){
-                const xx=x+dx*k, yy=y+dy*k, zz=z+dz*k;
-                if (!inBounds(xx,yy,zz)) { ok=false; break; }
-                coords.push(idx(xx,yy,zz));
-              }
-              if (!ok) continue;
-              if (inBounds(x-dx, y-dy, z-dz)) continue;
-              const key = coords.join(',');
-              if (!set.has(key)){ set.add(key); lines.push(coords); }
-            }
-          }
+    const set=new Set(), lines=[];
+    for(let z=0;z<n;z++) for(let y=0;y<n;y++) for(let x=0;x<n;x++){
+      for(const [dx,dy,dz] of dirs){
+        const coords=[];
+        let ok=true;
+        for(let k=0;k<n;k++){
+          const xx=x+dx*k, yy=y+dy*k, zz=z+dz*k;
+          if(!inBounds(xx,yy,zz)){ok=false;break;}
+          coords.push(idx(xx,yy,zz));
         }
-      }
-      return lines;
-    }
-
-    const WIN_LINES = generateLines(N);
-    linesBadge.textContent = `Linee: ${WIN_LINES.length}`;
-
-    const LINES_THROUGH = Array.from({length: SIZE}, () => []);
-    for (const line of WIN_LINES) for (const c of line) LINES_THROUGH[c].push(line);
-
-    // ----- Three.js setup -----
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x070a10, 10, 40);
-
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-    camera.position.set(9, 9, 12);
-
-    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-    viewport.appendChild(renderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.target.set(0,0,0);
-    controls.update();
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const key = new THREE.DirectionalLight(0xffffff, 0.9);
-    key.position.set(8, 12, 10);
-    scene.add(key);
-
-    const axes = new THREE.AxesHelper(6);
-    axes.material.transparent = true;
-    axes.material.opacity = 0.35;
-    scene.add(axes);
-
-    const root = new THREE.Group();
-    scene.add(root);
-
-    // --- cube geometry params ---
-    const cellSize = 1.0;
-    const gap = 0.22;
-    const baseSpacing = cellSize + gap;
-    let zSpacing = baseSpacing * 1.35;
-
-    const cubeHalf = (N-1) * baseSpacing / 2;
-
-    // meshes
-    const cellMeshes = new Array(SIZE);
-    const markerSprites = new Array(SIZE).fill(null);
-
-    let winLineObj = null;
-    let previewLineObjs = [];
-
-    // raycasting
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-          function pointOfIndex(i){
-      const {x,y,z} = toXYZ(i);
-      const px = (x * baseSpacing) - cubeHalf;
-      const py = ((N-1 - y) * baseSpacing) - cubeHalf;
-      const pz = ((N-1)/2 - z) * zSpacing;
-      return new THREE.Vector3(px, py, pz);
-    }
-
-    function markerSprite(letter, colorHex){
-      const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-
-      ctx.clearRect(0,0,256,256);
-      ctx.font = '900 170px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      ctx.lineWidth = 18;
-      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-      ctx.strokeText(letter, 128, 140);
-
-      ctx.fillStyle = colorHex;
-      ctx.fillText(letter, 128, 140);
-
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.needsUpdate = true;
-
-      const mat = new THREE.SpriteMaterial({
-        map: tex,
-        transparent: true,
-        opacity: 0.98,
-        depthWrite: false
-      });
-
-      const spr = new THREE.Sprite(mat);
-      spr.scale.set(0.9, 0.9, 0.9);
-      spr.position.set(0, 0, 0.7);
-      return spr;
-    }
-
-    function clearLines3D(){
-      for (const l of previewLineObjs) root.remove(l);
-      previewLineObjs = [];
-      if (winLineObj){ root.remove(winLineObj); winLineObj = null; }
-    }
-
-    function buildCube(){
-      while (root.children.length) root.remove(root.children[0]);
-      clearLines3D();
-
-      const geom = new THREE.BoxGeometry(cellSize, cellSize, cellSize);
-
-      for (let z=0; z<N; z++){
-        for (let y=0; y<N; y++){
-          for (let x=0; x<N; x++){
-            const i = idx(x,y,z);
-
-            const layerOpacity = [1.0, 0.78, 0.60, 0.45][z];
-
-            const mat = new THREE.MeshStandardMaterial({
-              color: 0x1a202c,
-              metalness: 0.15,
-              roughness: 0.35,
-              transparent: true,
-              opacity: 0.85 * layerOpacity
-            });
-
-            const mesh = new THREE.Mesh(geom, mat);
-            mesh.userData.index = i;
-            mesh.position.copy(pointOfIndex(i));
-
-            // wire edges (KubeApp-ish)
-            const edges = new THREE.EdgesGeometry(geom, 30);
-            const eLine = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-              color: 0xffffff, transparent:true, opacity: 0.14
-            }));
-            mesh.add(eLine);
-
-            root.add(mesh);
-            cellMeshes[i] = mesh;
-
-            // restore markers from board
-            if (board[i]){
-              const spr = markerSprite(board[i], board[i]==='X' ? '#4aa3ff' : '#44d19e');
-              mesh.add(spr);
-              markerSprites[i] = spr;
-            }
-          }
-        }
-      }
-
-      applyPlaneFilter();
-      applyExplode();
-    }
-
-    function applyExplode(){
-      const mult = explode ? 1.55 : 1.0;
-      zSpacing = baseSpacing * 1.35 * zScale * mult;
-
-      for (let i=0;i<SIZE;i++){
-        if (!cellMeshes[i]) continue;
-        cellMeshes[i].position.copy(pointOfIndex(i));
-      }
-      clearLines3D();
-    }
-
-    function applyPlaneFilter(){
-      for (let i=0;i<SIZE;i++){
-        const {z} = toXYZ(i);
-        cellMeshes[i].visible = (planeZ === null) ? true : (z === planeZ);
-      }
-      clearLines3D();
-    }
-
-    function setMouseFromEvent(ev){
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
-    }
-
-    function pick(ev){
-      setMouseFromEvent(ev);
-      raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(root.children, false).filter(h => h.object.visible);
-      return hits.length ? hits[0].object : null;
-    }
-
-    function placeMark(i, player){
-      board[i] = player;
-      const mesh = cellMeshes[i];
-      if (!mesh) return;
-
-      if (markerSprites[i]){
-        mesh.remove(markerSprites[i]);
-        markerSprites[i] = null;
-      }
-      const spr = markerSprite(player, player==='X' ? '#4aa3ff' : '#44d19e');
-      mesh.add(spr);
-      markerSprites[i] = spr;
-    }
-          function checkWinner(){
-      for (const line of WIN_LINES){
-        const a = board[line[0]];
-        if (!a) continue;
-        let ok = true;
-        for (let k=1;k<line.length;k++){
-          if (board[line[k]] !== a){ ok=false; break; }
-        }
-        if (ok) return { winner:a, line };
-      }
-      if (board.every(v=>v)) return { winner:'D', line:null };
-      return { winner:null, line:null };
-    }
-
-    function drawLine3D(aIdx, bIdx, opacity){
-      const A = pointOfIndex(aIdx);
-      const B = pointOfIndex(bIdx);
-      const geom = new THREE.BufferGeometry().setFromPoints([A,B]);
-      const mat = new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity });
-      const line = new THREE.Line(geom, mat);
-      line.renderOrder = 999;
-      return line;
-    }
-
-    function clearPreview(){
-      clearLines3D();
-    }
-
-    function setPreview(i){
-      clearPreview();
-      if (!teach || gameOver || board[i]) return;
-
-      let lines = LINES_THROUGH[i];
-      if (planeZ !== null) lines = lines.filter(l => l.every(c => toXYZ(c).z === planeZ));
-
-      // limita per non riempire lo schermo
-      lines = lines.slice(0, 10);
-
-      for (const l of lines){
-        const obj = drawLine3D(l[0], l[3], 0.22);
-        previewLineObjs.push(obj);
-        root.add(obj);
+        if(!ok) continue;
+        if(inBounds(x-dx,y-dy,z-dz)) continue;
+        const key=coords.join(',');
+        if(!set.has(key)){set.add(key);lines.push(coords);}
       }
     }
+    return lines;
+  }
+  const WIN_LINES = generateLines(N);
+  linesBadge.textContent = `Linee: ${WIN_LINES.length}`;
 
-    function endGame(res){
-      gameOver = true;
-      clearPreview();
+  const LINES_THROUGH = Array.from({length:SIZE},()=>[]);
+  for(const line of WIN_LINES) for(const c of line) LINES_THROUGH[c].push(line);
 
-      if (res.winner === 'D'){
-        setStatus('Pareggio.');
-        lineInfo.style.display = 'none';
-      } else {
-        setStatus(`Vince ${res.winner}! (4 in linea)`);
-        score[res.winner]++; updateScores();
+  let board=Array(SIZE).fill(null);
+  let current='X';
+  let gameOver=false;
 
-        lineInfo.style.display = '';
-        const p0 = toXYZ(res.line[0]);
-        const p3 = toXYZ(res.line[3]);
-        lineInfo.textContent = `Linea: (${p0.x},${p0.y},${p0.z}) → (${p3.x},${p3.y},${p3.z})`;
+  let vsCPU=false;
+  let cpuLevel='normal';
+  let teach=true;
 
-        winLineObj = drawLine3D(res.line[0], res.line[3], 0.9);
-        root.add(winLineObj);
+  let explode=false;
+  let zScale=1.0;
+  let planeZ=null;
+
+  let score={X:0,O:0};
+
+  // Preview state
+  let hoveredIndex=null;
+  let previewAnchor=null;
+  let previewLines=[];
+  let winLine=null;
+
+  function empties(){
+    const e=[];
+    for(let i=0;i<SIZE;i++){
+      if(!board[i] && (planeZ===null || toXYZ(i).z===planeZ)) e.push(i);
+    }
+    return e;
+  }
+
+  function checkWinner(){
+    for(const line of WIN_LINES){
+      const a=board[line[0]];
+      if(!a) continue;
+      let ok=true;
+      for(let k=1;k<line.length;k++){ if(board[line[k]]!==a){ok=false;break;} }
+      if(ok) return {winner:a,line};
+    }
+    if(board.every(v=>v)) return {winner:'D', line:null};
+    return {winner:null,line:null};
+  }
+
+  function findImmediateWinMove(player){
+    const e=empties();
+    for(const i of e){
+      board[i]=player;
+      const r=checkWinner();
+      board[i]=null;
+      if(r.winner===player) return i;
+    }
+    return null;
+  }
+
+  function linePotential(line, player){
+    const opp=(player==='X')?'O':'X';
+    let p=0,o=0,e=0;
+    for(const c of line){
+      if(board[c]===player) p++;
+      else if(board[c]===opp) o++;
+      else e++;
+    }
+    if(p>0 && o>0) return 0;
+    if(p===3 && e===1) return 1000;
+    if(p===2 && e===2) return 80;
+    if(p===1 && e===3) return 10;
+    if(p===0 && e===4) return 2;
+    return 1;
+  }
+
+  function bestHeuristicMove(player){
+    const e=empties();
+    if(!e.length) return null;
+    if(cpuLevel==='easy') return e[Math.floor(Math.random()*e.length)];
+
+    const win=findImmediateWinMove(player);
+    if(win!=null) return win;
+
+    const opp=(player==='X')?'O':'X';
+    const block=findImmediateWinMove(opp);
+    if(block!=null) return block;
+
+    let best={i:e[0],score:-1e9};
+    for(const i of e){
+      let sum=0;
+      for(const line of LINES_THROUGH[i]){
+        if(planeZ!==null && !line.every(c=>toXYZ(c).z===planeZ)) continue;
+        sum += linePotential(line, player);
       }
-      updateTurn();
-    }
+      const p=toXYZ(i);
+      const centerBonus=(1.5-Math.abs(p.x-1.5))+(1.5-Math.abs(p.y-1.5))+(1.5-Math.abs(p.z-1.5));
+      sum += centerBonus*2;
 
-    function canPlay(i){
-      if (gameOver) return false;
-      if (board[i]) return false;
-      if (planeZ !== null && toXYZ(i).z !== planeZ) return false;
-      if (vsCPU && current === 'O') return false;
-      return true;
-    }
-
-    function play(i){
-      if (!canPlay(i)) return;
-
-      placeMark(i, current);
-      clearPreview();
-
-      const res = checkWinner();
-      if (res.winner){ endGame(res); return; }
-
-      current = (current==='X') ? 'O' : 'X';
-      setStatus(`Tocca a ${current}.`);
-      updateTurn();
-
-      if (vsCPU && current === 'O') cpuMove();
-    }
-
-    function empties(){
-      const e=[];
-      for (let i=0;i<SIZE;i++){
-        if (!board[i] && (planeZ===null || toXYZ(i).z===planeZ)) e.push(i);
+      if(cpuLevel==='hard'){
+        board[i]=player;
+        const oppWin=findImmediateWinMove(opp);
+        if(oppWin!=null) sum -= 500;
+        board[i]=null;
       }
-      return e;
+      if(sum>best.score) best={i,score:sum};
     }
+    return best.i;
+  }
 
-    function cpuMove(){
-      if (gameOver) return;
-      setStatus('CPU sta pensando…');
-
-      setTimeout(() => {
-        const e = empties();
-        if (!e.length) return;
-
-        // semplice ma divertente: random + tenta chiusura
-        const win = e.find(i => {
-          board[i]='O'; const r=checkWinner(); board[i]=null;
-          return r.winner==='O';
-        });
-        const block = e.find(i => {
-          board[i]='X'; const r=checkWinner(); board[i]=null;
-          return r.winner==='X';
-        });
-
-        let move = win ?? block ?? e[Math.floor(Math.random()*e.length)];
-        if (cpuLevel === 'hard'){
-          // hard: preferisci centro
-          move = e.sort((a,b)=>{
-            const pa=toXYZ(a), pb=toXYZ(b);
-            const ca = (1.5-Math.abs(pa.x-1.5))+(1.5-Math.abs(pa.y-1.5))+(1.5-Math.abs(pa.z-1.5));
-            const cb = (1.5-Math.abs(pb.x-1.5))+(1.5-Math.abs(pb.y-1.5))+(1.5-Math.abs(pb.z-1.5));
-            return cb-ca;
-          })[0];
-        }
-
-        placeMark(move, 'O');
-
-        const res = checkWinner();
-        if (res.winner){ endGame(res); return; }
-
-        current = 'X';
-        setStatus('Tocca a X.');
-        updateTurn();
-      }, 240);
-    }
-
-    // UI toggles
-    function toggleSwitch(el, state){
-      if (state === undefined) el.classList.toggle('on');
-      else el.classList.toggle('on', !!state);
-      el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false');
-      return el.classList.contains('on');
-    }
-
-    function buildZBar(){
-      const items = [
-        {label:'Tutti', v:null},
-        {label:'Z0', v:0},{label:'Z1', v:1},{label:'Z2', v:2},{label:'Z3', v:3},
-      ];
-      zbar.innerHTML='';
-      for (const it of items){
-        const b=document.createElement('button');
-        b.className='zbtn';
-        b.textContent=it.label;
-        b.onclick=()=>{ planeZ=it.v; syncZBar(); applyPlaneFilter(); };
-        zbar.appendChild(b);
-      }
-      syncZBar();
-    }
-    function syncZBar(){
-      [...zbar.querySelectorAll('.zbtn')].forEach(b=>b.classList.remove('active'));
-      [...zbar.querySelectorAll('.zbtn')].forEach(b=>{
-        const t=b.textContent;
-        const v=(t==='Tutti')?null:Number(t.slice(1));
-        if ((v===null && planeZ===null) || v===planeZ) b.classList.add('active');
-      });
-    }
-
-    // events (3D)
-    renderer.domElement.addEventListener('pointerdown', (ev) => {
-      const obj = pick(ev);
-      if (!obj) return;
-      play(obj.userData.index);
-    });
-
-    renderer.domElement.addEventListener('pointermove', (ev) => {
-      const obj = pick(ev);
-      if (!obj){ clearPreview(); return; }
-      const i = obj.userData.index;
-      if (teach && canPlay(i)) setPreview(i);
-      else clearPreview();
-    });
-
-    // UI wiring
-    resetBtn.onclick = () => newGame();
-    resetScoreBtn.onclick = () => { score={X:0,O:0}; updateScores(); newGame(); };
-
-    explodeSwitch.onclick = () => {
-      explode = toggleSwitch(explodeSwitch);
-      explodeBadge.textContent = explode ? 'ON' : 'OFF';
-      applyExplode();
-    };
-
-    zDepth.addEventListener('input', () => {
-      zScale = Number(zDepth.value);
-      applyExplode();
-    });
-
-    cpuSwitch.onclick = () => {
-      vsCPU = toggleSwitch(cpuSwitch);
-      cpuBadge.textContent = vsCPU ? 'ON' : 'OFF';
-      if (vsCPU && current==='O' && !gameOver) cpuMove();
-    };
-    cpuLevelSel.onchange = () => cpuLevel = cpuLevelSel.value;
-
-    teachSwitch.onclick = () => {
-      teach = toggleSwitch(teachSwitch);
-      teachBadge.textContent = teach ? 'ON' : 'OFF';
-      if (!teach) clearPreview();
-    };
-
-    // resize
-    function onResize(){
-      const w = viewport.clientWidth;
-      const h = viewport.clientHeight;
-      camera.aspect = w/h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w,h);
-    }
-    window.addEventListener('resize', onResize);
-
-    function newGame(){
-      board = Array(SIZE).fill(null);
-      current = 'X';
-      gameOver = false;
-      lineInfo.style.display='none';
-      setStatus('Tocca a X.');
-      updateTurn();
-      buildCube();
-    }
-
-    function animate(){
-      controls.update();
-      renderer.render(scene,camera);
-      requestAnimationFrame(animate);
-    }
-
-    // init
-    buildZBar();
-    updateScores();
-    setStatus('Tocca a X.');
-    updateTurn();
-    buildCube();
-    onResize();
-    animate();
-
-    // quick sanity log (se non vedi nulla, apri console)
-    console.log("Tris 3D WebGL OK — THREE:", THREE.REVISION);
-  </script>
-</body>
-</html>
+  function cpuMove(){
+    if(gameOver) return;
+    setStatus('CPU sta pensando…');
+    setTimeout(()=>{
+      const m=bestHeuristicMove('O');
+      if(m==null) return;
+      place(m,'O');
+      const r=checkWinner();
+      if(r.winner){ endGame(r); return; }
+      current='X'; updateTurn(); setStatus('Tocca a X.');
+    }, 220);
+  }
+  
