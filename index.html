@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tris 3D vero (4×4×4) — single file</title>
+  <title>Tris 3D vero (4×4×4) — REAL 3D</title>
   <style>
     :root{
       --bg:#070a10;
@@ -17,11 +17,17 @@
       --o:#44d19e;
 
       --cellBg1: rgba(255,255,255,.07);
-      --cellBg2: rgba(0,0,0,.15);
+      --cellBg2: rgba(0,0,0,.18);
 
-      --glow: rgba(74,163,255,.38);
-      --glow2: rgba(255,255,255,.10);
+      /* 3D defaults */
+      --rx: 18deg;
+      --ry: -28deg;
+
+      /* Z spacing: visible depth even when not "exploded" */
+      --zGap: 92px;         /* OFF explode */
+      --zGapExploded: 150px;/* ON explode */
     }
+
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -39,12 +45,12 @@
     }
 
     .app{
-      width:min(1100px, 100%);
+      width:min(1240px, 100%);
       display:grid;
-      grid-template-columns: 1.2fr .8fr;
+      grid-template-columns: 1.25fr .75fr;
       gap:18px;
     }
-    @media (max-width: 940px){ .app{grid-template-columns: 1fr;} }
+    @media (max-width: 1000px){ .app{grid-template-columns: 1fr;} }
 
     .panel{
       border: 1px solid var(--line);
@@ -64,7 +70,7 @@
       gap:12px;
     }
     h1{margin:0;font-size:18px;letter-spacing:.2px}
-    .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.3}
+    .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.35}
     .badge{
       font-size:12px;
       color:var(--muted);
@@ -77,7 +83,7 @@
     .content{padding:18px}
 
     .status{
-      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
       padding:12px 14px;
       border:1px solid var(--line);
       border-radius:14px;
@@ -85,7 +91,7 @@
       margin-bottom:14px;
     }
     .status .mini{color:var(--muted);font-size:12px}
-    .status strong{font-weight:900}
+    .status strong{font-weight:950}
     .pill{
       font-size:12px;
       padding:6px 10px;
@@ -94,6 +100,7 @@
       color:var(--muted);
       background: rgba(255,255,255,.03);
       user-select:none;
+      align-self:flex-start;
     }
 
     /* -------- 3D stage -------- */
@@ -103,31 +110,42 @@
       padding: 10px 0 4px;
     }
     .perspective{
-      perspective: 1100px;
-      width: min(560px, 100%);
+      perspective: 1200px;
+      width: min(640px, 100%);
       aspect-ratio: 1 / 1;
       display:grid;
       place-items:center;
       position:relative;
+      isolation: isolate; /* helps overlays */
     }
 
-    /* 2D overlay for win-line (robust with perspective/rotate/explode) */
+    /* 2D overlay for win-line + preview lines (robust with transforms) */
     .overlay{
       position:absolute;
       inset: 0;
       pointer-events:none;
-      z-index: 50;
-      overflow: visible;
+      z-index: 90;
     }
-    .overlay line{
-      stroke: rgba(255,255,255,.85);
+    .overlay line.win{
+      stroke: rgba(255,255,255,.92);
       stroke-width: 4;
       stroke-linecap: round;
       filter: drop-shadow(0 10px 18px rgba(0,0,0,.65));
     }
-    .overlay .dot{
+    .overlay circle.win{
       fill: rgba(255,255,255,.92);
       filter: drop-shadow(0 10px 18px rgba(0,0,0,.65));
+    }
+    .overlay line.prev{
+      stroke: rgba(255,255,255,.28);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 7 8;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.45));
+    }
+    .overlay circle.prev{
+      fill: rgba(255,255,255,.38);
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.45));
     }
 
     .cube{
@@ -135,20 +153,21 @@
       height: 100%;
       position:relative;
       transform-style: preserve-3d;
-      transform: rotateX(var(--rx, 18deg)) rotateY(var(--ry, -22deg));
-      transition: transform .18s ease;
+      transform: rotateX(var(--rx)) rotateY(var(--ry));
+      transition: transform .16s ease;
       filter: drop-shadow(0 26px 60px rgba(0,0,0,.55));
     }
 
+    /* Base platform and "frame" to enhance depth perception */
     .platform{
       position:absolute;
       inset: 0;
       border-radius: 22px;
       background:
-        radial-gradient(700px 420px at 35% 20%, rgba(255,255,255,.10), transparent 60%),
-        linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
+        radial-gradient(700px 420px at 35% 20%, rgba(255,255,255,.11), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.22));
       border: 1px solid rgba(255,255,255,.14);
-      transform: translateZ(-26px);
+      transform: translateZ(-40px);
     }
     .platform::after{
       content:"";
@@ -156,7 +175,25 @@
       inset: 14px;
       border-radius: 18px;
       border: 1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.16);
+      background: rgba(0,0,0,.18);
+    }
+
+    /* add a subtle "side wall" to read thickness */
+    .wall{
+      position:absolute;
+      inset: 10px;
+      border-radius: 20px;
+      transform-style: preserve-3d;
+      pointer-events:none;
+    }
+    .wall::before{
+      content:"";
+      position:absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.30));
+      border: 1px solid rgba(255,255,255,.08);
+      transform: translateZ(-58px);
     }
 
     .layer{
@@ -164,29 +201,20 @@
       inset: 18px;
       border-radius: 18px;
       border: 1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.08);
       transform-style: preserve-3d;
       display:grid;
       place-items:center;
       overflow:hidden;
       transition: filter .12s ease, opacity .12s ease, border-color .12s ease;
+      /* IMPORTANT: semi transparent, so you see behind */
+      background: rgba(0,0,0,.06);
+      backdrop-filter: blur(0.0px);
     }
 
-    /* highlight hovered/active level */
-    .layer.focus{
-      border-color: rgba(74,163,255,.55);
-      filter: brightness(1.06);
-      box-shadow: 0 0 0 2px rgba(74,163,255,.12) inset;
-    }
-    .layer.dim{
-      opacity: .62;
-      filter: brightness(.92);
-    }
-
+    /* label */
     .layer .layerLabel{
       position:absolute;
-      top:10px;
-      left:10px;
+      top:10px; left:10px;
       font-size: 12px;
       color: var(--muted);
       border: 1px solid rgba(255,255,255,.10);
@@ -195,6 +223,25 @@
       border-radius: 999px;
       user-select:none;
       backdrop-filter: blur(6px);
+      z-index: 5;
+    }
+
+    /* layer depth shading: farther layers slightly dimmer */
+    .layer[data-z="0"]{ opacity: 1.00; }
+    .layer[data-z="1"]{ opacity: 0.92; }
+    .layer[data-z="2"]{ opacity: 0.86; }
+    .layer[data-z="3"]{ opacity: 0.80; }
+
+    /* hover focus */
+    .layer.focus{
+      border-color: rgba(74,163,255,.55);
+      filter: brightness(1.07);
+      box-shadow: 0 0 0 2px rgba(74,163,255,.12) inset;
+    }
+    /* plane filter dim */
+    .layer.dim{
+      opacity: 0.45 !important;
+      filter: brightness(.92);
     }
 
     .grid{
@@ -231,9 +278,9 @@
       overflow:hidden;
     }
     .cell:hover{
-      border-color: rgba(74,163,255,.45);
-      transform: translateZ(6px);
-      filter: brightness(1.05);
+      border-color: rgba(74,163,255,.55);
+      transform: translateZ(8px);
+      filter: brightness(1.06);
     }
     .cell:active{ transform: translateZ(2px) scale(.99); filter: brightness(.98); }
     .cell[disabled]{ cursor:not-allowed; opacity:.82; }
@@ -242,21 +289,34 @@
     .cell.o{ color: var(--o); }
 
     .token{
-      transform: translateZ(18px) scale(.90);
+      transform: translateZ(22px) scale(.92);
       opacity: 0;
       animation: pop .16s ease forwards;
       text-shadow: 0 12px 24px rgba(0,0,0,.45);
     }
-    @keyframes pop{ to{ transform: translateZ(24px) scale(1); opacity:1; } }
+    @keyframes pop{ to{ transform: translateZ(28px) scale(1); opacity:1; } }
 
     .cell.win{
-      border-color: rgba(255,255,255,.55);
+      border-color: rgba(255,255,255,.60);
       box-shadow:
         0 14px 30px rgba(0,0,0,.38),
         0 0 0 2px rgba(255,255,255,.10),
         inset 0 1px 0 rgba(255,255,255,.14);
       filter: brightness(1.10);
       opacity: 1;
+    }
+
+    /* preview highlight on cells */
+    .cell.preview{
+      border-color: rgba(255,255,255,.26);
+      filter: brightness(1.04);
+    }
+    .cell.anchor{
+      border-color: rgba(255,255,255,.40);
+      box-shadow:
+        0 0 0 2px rgba(255,255,255,.08),
+        0 14px 30px rgba(0,0,0,.35),
+        inset 0 1px 0 rgba(255,255,255,.12);
     }
 
     /* Controls */
@@ -273,7 +333,7 @@
       padding: 11px 12px;
       border-radius: 14px;
       cursor:pointer;
-      font-weight: 900;
+      font-weight: 950;
       transition: transform .06s ease, background .2s ease, border-color .2s ease;
     }
     .btn:hover{border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06)}
@@ -301,6 +361,7 @@
     .row:last-child{margin-bottom:0}
     label{font-size:13px;font-weight:950}
     input[type="range"]{ width: 200px; }
+
     .toggle{
       display:flex; align-items:center; gap:10px;
       user-select:none;
@@ -325,6 +386,43 @@
     .switch.on{ border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14); }
     .switch.on .knob{ left: 24px; background: rgba(255,255,255,.92); }
 
+    /* Z selector */
+    .zbar{
+      display:flex;
+      gap:8px;
+      flex-wrap: wrap;
+      justify-content:flex-end;
+    }
+    .zbtn{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 950;
+      font-size: 12px;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+      user-select:none;
+    }
+    .zbtn:hover{border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06)}
+    .zbtn:active{transform: scale(.99)}
+    .zbtn.active{
+      border-color: rgba(74,163,255,.45);
+      background: rgba(74,163,255,.16);
+    }
+
+    select{
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,.14);
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-weight: 900;
+      cursor:pointer;
+      min-width: 180px;
+    }
+
     .score{
       display:grid;
       grid-template-columns: 1fr 1fr;
@@ -340,16 +438,30 @@
     .v{font-size:22px;font-weight:950}
     .hint{font-size:13px;color:var(--muted);line-height:1.5}
     .mini{font-size:12px;color:var(--muted)}
+
+    /* small helper badges */
+    .small{
+      font-size:11px;
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.14);
+      white-space:nowrap;
+    }
   </style>
 </head>
+
 <body>
   <div class="app">
-    <!-- LEFT -->
+    <!-- LEFT: game -->
     <div class="panel">
       <div class="hdr">
         <div>
           <h1>Tris 3D vero — 4×4×4</h1>
-          <div class="sub">Metti <b>4 in linea</b> nello spazio (anche tra livelli). Due giocatori locali.</div>
+          <div class="sub">
+            Metti <b>4 in linea</b> nello spazio. <span class="small" id="modeSmall">2 giocatori</span>
+          </div>
         </div>
         <div class="badge" id="linesBadge">Linee vincenti: …</div>
       </div>
@@ -366,14 +478,11 @@
 
         <div class="stage">
           <div class="perspective" id="perspective">
-            <svg class="overlay" id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <line id="winLine" x1="0" y1="0" x2="0" y2="0" style="display:none;"></line>
-              <circle id="winDotA" class="dot" r="5" cx="0" cy="0" style="display:none;"></circle>
-              <circle id="winDotB" class="dot" r="5" cx="0" cy="0" style="display:none;"></circle>
-            </svg>
+            <svg class="overlay" id="overlay" preserveAspectRatio="none"></svg>
 
             <div class="cube" id="cube">
               <div class="platform"></div>
+              <div class="wall"></div>
               <!-- layers injected -->
             </div>
           </div>
@@ -386,18 +495,18 @@
       </div>
     </div>
 
-    <!-- RIGHT -->
+    <!-- RIGHT: controls -->
     <div class="panel">
       <div class="hdr">
         <div>
-          <h1>Vista</h1>
-          <div class="sub">Ruota il “cubo” e separa i livelli.</div>
+          <h1>Controlli</h1>
+          <div class="sub">3D reale, filtro piano Z, CPU e modalità didattica.</div>
         </div>
-        <div class="badge">3D</div>
+        <div class="badge">REAL 3D</div>
       </div>
 
       <div class="section">
-        <h2>Controlli 3D</h2>
+        <h2>Vista 3D</h2>
 
         <div class="row">
           <label for="rx">Rotazione X</label>
@@ -406,7 +515,7 @@
 
         <div class="row">
           <label for="ry">Rotazione Y</label>
-          <input id="ry" type="range" min="-55" max="55" value="-22" />
+          <input id="ry" type="range" min="-55" max="55" value="-28" />
         </div>
 
         <div class="row">
@@ -416,10 +525,69 @@
             </div>
             <div>
               <div style="font-weight:950;font-size:13px">Esplodi livelli</div>
-              <div class="mini">Separa Z=0..3 per leggere meglio</div>
+              <div class="mini">Aumenta la distanza tra Z0…Z3</div>
             </div>
           </div>
           <div class="badge" id="explodeBadge">OFF</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Gioca a piani (Z)</h2>
+        <div class="row" style="align-items:flex-start;">
+          <div>
+            <div style="font-weight:950;font-size:13px">Selettore livello</div>
+            <div class="mini">In “Z0..Z3” puoi cliccare solo su quel piano</div>
+          </div>
+          <div class="zbar" id="zbar"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>CPU</h2>
+
+        <div class="row">
+          <div class="toggle">
+            <div class="switch" id="cpuSwitch" role="switch" aria-checked="false" tabindex="0">
+              <div class="knob"></div>
+            </div>
+            <div>
+              <div style="font-weight:950;font-size:13px">Vs CPU</div>
+              <div class="mini">La CPU gioca con <b>O</b></div>
+            </div>
+          </div>
+          <div class="badge" id="cpuBadge">OFF</div>
+        </div>
+
+        <div class="row">
+          <label for="cpuLevel">Difficoltà</label>
+          <select id="cpuLevel">
+            <option value="easy">Facile</option>
+            <option value="normal" selected>Normale</option>
+            <option value="hard">Difficile</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Didattica</h2>
+
+        <div class="row">
+          <div class="toggle">
+            <div class="switch on" id="teachSwitch" role="switch" aria-checked="true" tabindex="0">
+              <div class="knob"></div>
+            </div>
+            <div>
+              <div style="font-weight:950;font-size:13px">Preview linee</div>
+              <div class="mini">Mostra linee 4-in-a-row che passano dalla cella</div>
+            </div>
+          </div>
+          <div class="badge" id="teachBadge">ON</div>
+        </div>
+
+        <div class="hint">
+          • Passa il mouse su una casella vuota per vedere le linee.<br/>
+          • Se hai selezionato un piano Z, le preview si limitano a quel piano.
         </div>
       </div>
 
@@ -430,41 +598,45 @@
           <div class="card"><div class="k">O</div><div class="v" id="scoreO">0</div></div>
         </div>
       </div>
-
-      <div class="section">
-        <h2>Note</h2>
-        <div class="hint">
-          • Ogni casella è <b>(x,y,z)</b> con x,y,z da 0 a 3.<br/>
-          • Vittoria: 4 uguali in una linea (qualunque direzione).<br/>
-          • Hover: evidenzia il livello Z per orientarti.
-        </div>
-      </div>
     </div>
   </div>
 
 <script>
 (() => {
-  const N = 4; // 4x4x4
+  const N = 4;
   const SIZE = N*N*N;
 
-  // Board: null | 'X' | 'O'
+  // board
   let board = Array(SIZE).fill(null);
   let current = 'X';
   let gameOver = false;
 
-  let score = { X:0, O:0 };
+  // modes
+  let vsCPU = false;       // if true: O is CPU
+  let cpuLevel = 'normal'; // easy | normal | hard
+  let teach = true;        // preview lines
+  let explode = false;
+  let planeZ = null;       // null = all, else 0..3 "play only on that plane"
 
-  // focus/hover layer
+  // hover focus
   let hoverZ = null;
   let pinnedZ = null;
+
+  // win visuals
+  let winSet = null;
+  let winLine = null;
+
+  // preview visuals
+  let previewAnchor = null;
+  let previewLines = []; // array of lines (each line is indices[4])
+
+  // score
+  let score = { X:0, O:0 };
 
   // UI refs
   const cube = document.getElementById('cube');
   const perspective = document.getElementById('perspective');
   const overlay = document.getElementById('overlay');
-  const winLineEl = document.getElementById('winLine');
-  const winDotA = document.getElementById('winDotA');
-  const winDotB = document.getElementById('winDotB');
 
   const statusText = document.getElementById('statusText');
   const turnPill = document.getElementById('turnPill');
@@ -482,9 +654,18 @@
   const explodeSwitch = document.getElementById('explodeSwitch');
   const explodeBadge = document.getElementById('explodeBadge');
 
-  const linesBadge = document.getElementById('linesBadge');
+  const cpuSwitch = document.getElementById('cpuSwitch');
+  const cpuBadge = document.getElementById('cpuBadge');
+  const cpuLevelSel = document.getElementById('cpuLevel');
 
-  // ---------- helpers ----------
+  const teachSwitch = document.getElementById('teachSwitch');
+  const teachBadge = document.getElementById('teachBadge');
+
+  const zbar = document.getElementById('zbar');
+  const linesBadge = document.getElementById('linesBadge');
+  const modeSmall = document.getElementById('modeSmall');
+
+  // helpers
   const idx = (x,y,z) => z*N*N + y*N + x;
   const toXYZ = (i) => {
     const z = Math.floor(i / (N*N));
@@ -502,13 +683,8 @@
     scoreX.textContent = score.X;
     scoreO.textContent = score.O;
   }
-  function updateCubeRotation(){
-    cube.style.setProperty('--rx', rx.value + 'deg');
-    cube.style.setProperty('--ry', ry.value + 'deg');
-    requestAnimationFrame(updateWinOverlay);
-  }
 
-  // Generate ALL unique winning lines of length N in NxNxN
+  // generate winning lines
   function generateLines(n){
     const dirs = [];
     for (let dx=-1; dx<=1; dx++){
@@ -516,7 +692,7 @@
         for (let dz=-1; dz<=1; dz++){
           if (dx===0 && dy===0 && dz===0) continue;
           const firstNonZero = (dx!==0) ? dx : (dy!==0 ? dy : dz);
-          if (firstNonZero < 0) continue; // canonical
+          if (firstNonZero < 0) continue; // canonical direction
           dirs.push([dx,dy,dz]);
         }
       }
@@ -539,10 +715,7 @@
               coords.push(idx(xx,yy,zz));
             }
             if (!ok) continue;
-
-            // minimal start for this direction
-            if (inBounds(x-dx, y-dy, z-dz)) continue;
-
+            if (inBounds(x-dx, y-dy, z-dz)) continue; // minimal start
             const key = coords.join(',');
             if (!set.has(key)){
               set.add(key);
@@ -558,17 +731,170 @@
   const WIN_LINES = generateLines(N);
   linesBadge.textContent = `Linee vincenti: ${WIN_LINES.length}`;
 
-  // ---------- rendering ----------
-  let winSet = null;
-  let winLine = null; // array of indices (length 4)
-
-  function clearLayers(){
-    [...cube.querySelectorAll('.layer')].forEach(n => n.remove());
+  // Precompute "lines through each cell" for fast preview/AI
+  const LINES_THROUGH = Array.from({length: SIZE}, () => []);
+  for (const line of WIN_LINES){
+    for (const c of line) LINES_THROUGH[c].push(line);
   }
 
+  // rotation updates
+  function updateCubeRotation(){
+    document.documentElement.style.setProperty('--rx', rx.value + 'deg');
+    document.documentElement.style.setProperty('--ry', ry.value + 'deg');
+    requestAnimationFrame(updateOverlay);
+  }
+
+  // Z selector UI
+  function buildZBar(){
+    const items = [
+      { label: 'Tutti', value: null },
+      { label: 'Z0', value: 0 },
+      { label: 'Z1', value: 1 },
+      { label: 'Z2', value: 2 },
+      { label: 'Z3', value: 3 },
+    ];
+    zbar.innerHTML = '';
+    for (const it of items){
+      const b = document.createElement('button');
+      b.className = 'zbtn';
+      b.type = 'button';
+      b.textContent = it.label;
+      b.addEventListener('click', () => {
+        planeZ = it.value;
+        pinnedZ = planeZ; // orientamento
+        clearPreview();
+        render();
+      });
+      zbar.appendChild(b);
+    }
+    syncZBar();
+  }
+  function syncZBar(){
+    [...zbar.querySelectorAll('.zbtn')].forEach(btn => btn.classList.remove('active'));
+    const map = new Map([['Tutti', null], ['Z0',0], ['Z1',1], ['Z2',2], ['Z3',3]]);
+    [...zbar.querySelectorAll('.zbtn')].forEach(btn => {
+      const v = map.get(btn.textContent);
+      if (v === planeZ) btn.classList.add('active');
+      if (v === null && planeZ === null) btn.classList.add('active');
+    });
+  }
+
+  // overlay drawing (win + preview)
+  function setOverlayViewBox(){
+    const r = perspective.getBoundingClientRect();
+    overlay.setAttribute('viewBox', `0 0 ${Math.max(1, r.width)} ${Math.max(1, r.height)}`);
+    overlay.setAttribute('width', r.width);
+    overlay.setAttribute('height', r.height);
+  }
+  function centerOfElement(el){
+    const pr = perspective.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return {
+      x: (r.left - pr.left) + r.width/2,
+      y: (r.top - pr.top) + r.height/2
+    };
+  }
+  function clearOverlay(){
+    overlay.innerHTML = '';
+  }
+  function drawLine2D(A, B, cls){
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', A.x); line.setAttribute('y1', A.y);
+    line.setAttribute('x2', B.x); line.setAttribute('y2', B.y);
+    line.setAttribute('class', cls);
+    overlay.appendChild(line);
+
+    const dotA = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dotA.setAttribute('cx', A.x); dotA.setAttribute('cy', A.y);
+    dotA.setAttribute('r', 5);
+    dotA.setAttribute('class', cls);
+    overlay.appendChild(dotA);
+
+    const dotB = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dotB.setAttribute('cx', B.x); dotB.setAttribute('cy', B.y);
+    dotB.setAttribute('r', 5);
+    dotB.setAttribute('class', cls);
+    overlay.appendChild(dotB);
+  }
+
+  function updateOverlay(){
+    setOverlayViewBox();
+    clearOverlay();
+
+    // preview lines
+    if (teach && previewAnchor != null && previewLines.length){
+      for (const line of previewLines){
+        const aIdx = line[0];
+        const bIdx = line[line.length - 1];
+        const aEl = cube.querySelector(`.cell[data-index="${aIdx}"]`);
+        const bEl = cube.querySelector(`.cell[data-index="${bIdx}"]`);
+        if (!aEl || !bEl) continue;
+        drawLine2D(centerOfElement(aEl), centerOfElement(bEl), 'prev');
+      }
+    }
+
+    // win line
+    if (winLine && winLine.length){
+      const aIdx = winLine[0];
+      const bIdx = winLine[winLine.length - 1];
+      const aEl = cube.querySelector(`.cell[data-index="${aIdx}"]`);
+      const bEl = cube.querySelector(`.cell[data-index="${bIdx}"]`);
+      if (aEl && bEl){
+        drawLine2D(centerOfElement(aEl), centerOfElement(bEl), 'win');
+      }
+    }
+  }
+
+  // preview helpers
+  function clearPreview(){
+    previewAnchor = null;
+    previewLines = [];
+    [...cube.querySelectorAll('.cell.preview, .cell.anchor')].forEach(el => {
+      el.classList.remove('preview','anchor');
+    });
+    requestAnimationFrame(updateOverlay);
+  }
+
+  function setPreviewForCell(i){
+    clearPreview();
+    if (!teach) return;
+    if (gameOver) return;
+    if (board[i]) return;
+
+    previewAnchor = i;
+
+    // collect candidate lines
+    let lines = LINES_THROUGH[i];
+
+    // if planeZ is selected, show only lines that are entirely on that z plane
+    if (planeZ !== null){
+      lines = lines.filter(line => line.every(c => toXYZ(c).z === planeZ));
+    }
+
+    // cap number to avoid clutter: choose lines with most "potential"
+    const scored = lines.map(line => ({ line, score: linePotential(line, current) }))
+                        .sort((a,b) => b.score - a.score);
+
+    previewLines = scored.slice(0, 8).map(x => x.line);
+
+    // highlight cells
+    const anchorEl = cube.querySelector(`.cell[data-index="${i}"]`);
+    if (anchorEl) anchorEl.classList.add('anchor');
+
+    const toMark = new Set();
+    for (const l of previewLines) for (const c of l) toMark.add(c);
+    for (const c of toMark){
+      const el = cube.querySelector(`.cell[data-index="${c}"]`);
+      if (el) el.classList.add('preview');
+    }
+
+    requestAnimationFrame(updateOverlay);
+  }
+
+  // layer focus (hoverZ or pinnedZ or planeZ)
   function applyLayerFocus(){
     const layers = [...cube.querySelectorAll('.layer')];
-    const z = (hoverZ !== null) ? hoverZ : pinnedZ;
+    const z = (hoverZ !== null) ? hoverZ : (planeZ !== null ? planeZ : pinnedZ);
 
     layers.forEach(layer => {
       const layerZ = Number(layer.getAttribute('data-z'));
@@ -577,21 +903,241 @@
       if (z === null) return;
 
       if (layerZ === z) layer.classList.add('focus');
-      else layer.classList.add('dim');
+      else if (planeZ !== null) layer.classList.add('dim');
     });
+  }
+
+  // winner check
+  function checkWinner(){
+    for (const line of WIN_LINES){
+      const a = board[line[0]];
+      if (!a) continue;
+      let ok = true;
+      for (let k=1; k<line.length; k++){
+        if (board[line[k]] !== a){ ok=false; break; }
+      }
+      if (ok) return { winner: a, line };
+    }
+    if (board.every(v => v)) return { winner: 'D', line: null };
+    return { winner: null, line: null };
+  }
+
+  function lineDirectionInfo(line){
+    const p0 = toXYZ(line[0]);
+    const p1 = toXYZ(line[1]);
+    const p3 = toXYZ(line[3]);
+    return {
+      p0, p3,
+      dx: (p1.x - p0.x),
+      dy: (p1.y - p0.y),
+      dz: (p1.z - p0.z),
+    };
+  }
+
+  function endGame(res){
+    gameOver = true;
+    clearPreview();
+
+    if (res.winner === 'D'){
+      setStatus('Pareggio (griglia piena).', true);
+      lineInfo.style.display = 'none';
+      winSet = null;
+      winLine = null;
+    } else {
+      score[res.winner]++;
+      updateScores();
+      setStatus(`Vince ${res.winner}! (4 in linea)`, true);
+
+      winSet = new Set(res.line);
+      winLine = res.line.slice();
+
+      const info = lineDirectionInfo(winLine);
+      lineInfo.style.display = '';
+      lineInfo.textContent =
+        `Linea: (${info.p0.x},${info.p0.y},${info.p0.z}) → (${info.p3.x},${info.p3.y},${info.p3.z}) dir (${info.dx},${info.dy},${info.dz})`;
+
+      pinnedZ = info.p0.z;
+    }
+
+    render();
+  }
+
+  // is cell clickable?
+  function cellPlayable(i){
+    if (gameOver) return false;
+    if (board[i]) return false;
+    const {z} = toXYZ(i);
+    if (planeZ !== null && z !== planeZ) return false;
+    if (vsCPU && current === 'O') return false;
+    return true;
+  }
+
+  // play
+  async function play(i){
+    if (!cellPlayable(i)) return;
+
+    board[i] = current;
+    pinnedZ = toXYZ(i).z;
+    clearPreview();
+
+    const res = checkWinner();
+    if (res.winner){
+      endGame(res);
+      return;
+    }
+
+    current = (current === 'X') ? 'O' : 'X';
+    setStatus(`Tocca a ${current}.`, true);
+    render();
+
+    // CPU move
+    if (vsCPU && current === 'O'){
+      await cpuTurn();
+    }
+  }
+
+  // CPU engine (simple but fun)
+  function empties(){
+    const e = [];
+    for (let i=0; i<SIZE; i++){
+      if (!board[i]){
+        if (planeZ === null || toXYZ(i).z === planeZ) e.push(i);
+      }
+    }
+    return e;
+  }
+
+  function linePotential(line, player){
+    // higher is better for "player"
+    // score based on presence of opponent pieces + player pieces
+    const opp = (player === 'X') ? 'O' : 'X';
+    let p = 0, o = 0, empty = 0;
+    for (const c of line){
+      if (board[c] === player) p++;
+      else if (board[c] === opp) o++;
+      else empty++;
+    }
+    if (o > 0 && p > 0) return 0; // blocked line
+    // favor near-wins
+    if (p === 3 && empty === 1) return 1000;
+    if (p === 2 && empty === 2) return 80;
+    if (p === 1 && empty === 3) return 10;
+    if (p === 0 && empty === 4) return 2;
+    // if line has only opponent (for defense scoring)
+    if (o === 3 && empty === 1) return 900;
+    if (o === 2 && empty === 2) return 60;
+    return 1;
+  }
+
+  function findImmediateWinMove(player){
+    const e = empties();
+    for (const i of e){
+      board[i] = player;
+      const res = checkWinner();
+      board[i] = null;
+      if (res.winner === player) return i;
+    }
+    return null;
+  }
+
+  function bestHeuristicMove(player){
+    const e = empties();
+    if (!e.length) return null;
+
+    // If difficulty easy: random among empties
+    if (cpuLevel === 'easy'){
+      return e[Math.floor(Math.random() * e.length)];
+    }
+
+    // Win / Block always for normal+hard
+    const win = findImmediateWinMove(player);
+    if (win != null) return win;
+
+    const opp = (player === 'X') ? 'O' : 'X';
+    const block = findImmediateWinMove(opp);
+    if (block != null) return block;
+
+    // score each empty cell by summing potentials across lines through it
+    let best = { i: e[0], score: -Infinity };
+
+    for (const i of e){
+      const lines = LINES_THROUGH[i];
+      let scoreSum = 0;
+
+      for (const line of lines){
+        // if planeZ filter: only consider lines fully in plane
+        if (planeZ !== null && !line.every(c => toXYZ(c).z === planeZ)) continue;
+        scoreSum += linePotential(line, player);
+      }
+
+      // add slight center-ish preference (x,y,z closer to middle)
+      const p = toXYZ(i);
+      const centerBias = (1.5 - Math.abs(p.x - 1.5)) + (1.5 - Math.abs(p.y - 1.5)) + (1.5 - Math.abs(p.z - 1.5));
+      scoreSum += centerBias * 2;
+
+      // Hard: add a bit more lookahead (simulate one step opponent response)
+      if (cpuLevel === 'hard'){
+        board[i] = player;
+        // punish moves that allow opponent immediate win
+        const oppWin = findImmediateWinMove(opp);
+        if (oppWin != null) scoreSum -= 500;
+        board[i] = null;
+      }
+
+      if (scoreSum > best.score){
+        best = { i, score: scoreSum };
+      }
+    }
+    return best.i;
+  }
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  async function cpuTurn(){
+    if (gameOver) return;
+
+    setStatus('La CPU sta pensando…', true);
+    render();
+    await sleep(240);
+
+    const move = bestHeuristicMove('O');
+    if (move == null) return;
+
+    board[move] = 'O';
+    pinnedZ = toXYZ(move).z;
+
+    const res = checkWinner();
+    if (res.winner){
+      endGame(res);
+      return;
+    }
+
+    current = 'X';
+    setStatus('Tocca a X.', true);
+    render();
+  }
+
+  // render cube
+  function clearLayers(){
+    [...cube.querySelectorAll('.layer')].forEach(n => n.remove());
   }
 
   function render(){
     clearLayers();
 
-    const exploded = explodeSwitch.classList.contains('on');
-    const zGap = exploded ? 110 : 26; // + leggibilità quando ON
+    // spacing
+    const zGap = explode ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--zGapExploded')) :
+                           parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--zGap'));
 
+    // IMPORTANT: real depth ordering: Z0 in front, Z3 behind
+    // translateZ = ((N-1)/2 - z) * zGap
     for (let z=0; z<N; z++){
       const layer = document.createElement('div');
       layer.className = 'layer';
       layer.setAttribute('data-z', String(z));
-      layer.style.transform = `translateZ(${(z - (N-1)/2) * zGap}px)`;
+
+      const tz = ((N-1)/2 - z) * zGap;
+      layer.style.transform = `translateZ(${tz}px)`;
 
       const label = document.createElement('div');
       label.className = 'layerLabel';
@@ -620,23 +1166,31 @@
             span.textContent = v;
             btn.appendChild(span);
           } else {
-            btn.disabled = gameOver;
+            btn.disabled = !cellPlayable(i);
           }
 
           if (winSet && winSet.has(i)) btn.classList.add('win');
 
-          // Hover focus level
+          // hover = focus level + preview
           btn.addEventListener('mouseenter', () => {
-            hoverZ = Number(btn.dataset.z);
+            hoverZ = z;
             applyLayerFocus();
+            setPreviewForCell(i);
           });
           btn.addEventListener('mouseleave', () => {
             hoverZ = null;
             applyLayerFocus();
+            // keep preview only if anchored by click (we don’t anchor by click here)
+            clearPreview();
           });
 
-          // Click
-          btn.addEventListener('click', () => play(i, z));
+          // click
+          btn.addEventListener('click', async () => {
+            // anchor preview briefly
+            setPreviewForCell(i);
+            await play(i);
+          });
+
           grid.appendChild(btn);
         }
       }
@@ -645,144 +1199,26 @@
       cube.appendChild(layer);
     }
 
-    turnPill.textContent = `Turno: ${current}`;
-    explodeBadge.textContent = exploded ? 'ON' : 'OFF';
+    // plane dim
+    if (planeZ !== null){
+      [...cube.querySelectorAll('.layer')].forEach(layer => {
+        const z = Number(layer.getAttribute('data-z'));
+        if (z !== planeZ) layer.classList.add('dim');
+      });
+    }
 
+    // focus layer
     applyLayerFocus();
-    requestAnimationFrame(updateWinOverlay);
-  }
 
-  // ---------- win overlay ----------
-  function hideWinOverlay(){
-    winLineEl.style.display = 'none';
-    winDotA.style.display = 'none';
-    winDotB.style.display = 'none';
-  }
+    // top UI
+    turnPill.textContent = `Turno: ${current}`;
+    explodeBadge.textContent = explode ? 'ON' : 'OFF';
+    cpuBadge.textContent = vsCPU ? 'ON' : 'OFF';
+    teachBadge.textContent = teach ? 'ON' : 'OFF';
+    modeSmall.textContent = vsCPU ? 'Vs CPU' : '2 giocatori';
+    syncZBar();
 
-  function setOverlayViewBox(){
-    const r = perspective.getBoundingClientRect();
-    overlay.setAttribute('viewBox', `0 0 ${Math.max(1, r.width)} ${Math.max(1, r.height)}`);
-  }
-
-  function centerOfElement(el){
-    const pr = perspective.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    return {
-      x: (r.left - pr.left) + r.width/2,
-      y: (r.top - pr.top) + r.height/2
-    };
-  }
-
-  function updateWinOverlay(){
-    setOverlayViewBox();
-    if (!winLine || winLine.length < 2) { hideWinOverlay(); return; }
-
-    const aIdx = winLine[0];
-    const bIdx = winLine[winLine.length - 1];
-
-    const aEl = cube.querySelector(`.cell[data-index="${aIdx}"]`);
-    const bEl = cube.querySelector(`.cell[data-index="${bIdx}"]`);
-
-    if (!aEl || !bEl) { hideWinOverlay(); return; }
-
-    const A = centerOfElement(aEl);
-    const B = centerOfElement(bEl);
-
-    winLineEl.setAttribute('x1', A.x);
-    winLineEl.setAttribute('y1', A.y);
-    winLineEl.setAttribute('x2', B.x);
-    winLineEl.setAttribute('y2', B.y);
-    winLineEl.style.display = '';
-
-    winDotA.setAttribute('cx', A.x);
-    winDotA.setAttribute('cy', A.y);
-    winDotA.style.display = '';
-
-    winDotB.setAttribute('cx', B.x);
-    winDotB.setAttribute('cy', B.y);
-    winDotB.style.display = '';
-  }
-
-  // ---------- game logic ----------
-  function checkWinner(){
-    for (const line of WIN_LINES){
-      const a = board[line[0]];
-      if (!a) continue;
-      let ok = true;
-      for (let k=1; k<line.length; k++){
-        if (board[line[k]] !== a){ ok=false; break; }
-      }
-      if (ok) return { winner: a, line };
-    }
-    if (board.every(v => v)) return { winner: 'D', line: null };
-    return { winner: null, line: null };
-  }
-
-  function lineDirectionInfo(line){
-    // line is array of indices (length 4)
-    const p0 = toXYZ(line[0]);
-    const p1 = toXYZ(line[1]);
-    const p3 = toXYZ(line[3]);
-    const dx = p1.x - p0.x;
-    const dy = p1.y - p0.y;
-    const dz = p1.z - p0.z;
-    return { p0, p3, dx, dy, dz };
-  }
-
-  function endGame(res){
-    gameOver = true;
-
-    if (res.winner === 'D'){
-      setStatus('Pareggio (griglia piena).', true);
-      lineInfo.style.display = 'none';
-      winSet = null;
-      winLine = null;
-      hideWinOverlay();
-    } else {
-      score[res.winner]++;
-      updateScores();
-      setStatus(`Vince ${res.winner}! (4 in linea)`, true);
-
-      winSet = new Set(res.line);
-      winLine = res.line.slice();
-
-      const info = lineDirectionInfo(winLine);
-      lineInfo.style.display = '';
-      lineInfo.textContent =
-        `Linea: (${info.p0.x},${info.p0.y},${info.p0.z}) → (${info.p3.x},${info.p3.y},${info.p3.z})  dir (${info.dx},${info.dy},${info.dz})`;
-
-      // auto focus sul livello del primo punto (utile quando non esploso)
-      pinnedZ = info.p0.z;
-    }
-
-    render();
-  }
-
-  function play(i, zClicked){
-    if (gameOver) return;
-    if (board[i]) return;
-
-    board[i] = current;
-
-    // Pin del livello appena giocato (così “capisci dove sei”)
-    pinnedZ = zClicked;
-
-    const res = checkWinner();
-    if (res.winner){
-      endGame(res);
-      return;
-    }
-
-    current = (current === 'X') ? 'O' : 'X';
-    setStatus(`Tocca a ${current}.`, true);
-
-    // clear win visuals
-    winSet = null;
-    winLine = null;
-    lineInfo.style.display = 'none';
-    hideWinOverlay();
-
-    render();
+    requestAnimationFrame(updateOverlay);
   }
 
   function newGame(){
@@ -792,41 +1228,85 @@
     winSet = null;
     winLine = null;
     hoverZ = null;
-    pinnedZ = null;
+    pinnedZ = planeZ; // if filtering, pin it
     lineInfo.style.display = 'none';
-    hideWinOverlay();
-
+    clearPreview();
     setStatus('Tocca a X. (Obiettivo: 4 in linea)', true);
     render();
   }
 
-  // ---------- UI events ----------
-  rx.addEventListener('input', updateCubeRotation);
-  ry.addEventListener('input', updateCubeRotation);
-
-  function toggleExplode(){
-    explodeSwitch.classList.toggle('on');
-    explodeSwitch.setAttribute('aria-checked', explodeSwitch.classList.contains('on') ? 'true' : 'false');
-    render();
-  }
-  explodeSwitch.addEventListener('click', toggleExplode);
-  explodeSwitch.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExplode(); }
-  });
-
-  resetBtn.addEventListener('click', newGame);
-  resetScoreBtn.addEventListener('click', () => {
+  function resetScore(){
     score = { X:0, O:0 };
     updateScores();
     newGame();
+  }
+
+  // switches helper
+  function toggleSwitch(el, state){
+    if (state === undefined) el.classList.toggle('on');
+    else el.classList.toggle('on', !!state);
+    el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false');
+    return el.classList.contains('on');
+  }
+
+  // UI events
+  rx.addEventListener('input', updateCubeRotation);
+  ry.addEventListener('input', updateCubeRotation);
+
+  explodeSwitch.addEventListener('click', () => {
+    explode = toggleSwitch(explodeSwitch);
+    render();
+  });
+  explodeSwitch.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); explode = toggleSwitch(explodeSwitch); render(); }
   });
 
-  // keep overlay accurate
-  window.addEventListener('resize', () => requestAnimationFrame(updateWinOverlay));
+  cpuSwitch.addEventListener('click', () => {
+    vsCPU = toggleSwitch(cpuSwitch);
+    // if it becomes CPU and it's O turn, run CPU
+    render();
+    if (vsCPU && current === 'O' && !gameOver) cpuTurn();
+  });
+  cpuSwitch.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); vsCPU = toggleSwitch(cpuSwitch); render(); if (vsCPU && current === 'O' && !gameOver) cpuTurn(); }
+  });
 
-  // ---------- init ----------
+  cpuLevelSel.addEventListener('change', () => {
+    cpuLevel = cpuLevelSel.value;
+  });
+
+  teachSwitch.addEventListener('click', () => {
+    teach = toggleSwitch(teachSwitch);
+    if (!teach) clearPreview();
+    render();
+  });
+  teachSwitch.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); teach = toggleSwitch(teachSwitch); if (!teach) clearPreview(); render(); }
+  });
+
+  resetBtn.addEventListener('click', newGame);
+  resetScoreBtn.addEventListener('click', resetScore);
+
+  window.addEventListener('resize', () => requestAnimationFrame(updateOverlay));
+
+  // init
   updateScores();
-  updateCubeRotation();
+  buildZBar();
+
+  // set defaults (consistent with CSS)
+  document.documentElement.style.setProperty('--rx', rx.value + 'deg');
+  document.documentElement.style.setProperty('--ry', ry.value + 'deg');
+
+  // switches default states
+  toggleSwitch(explodeSwitch, false);
+  toggleSwitch(cpuSwitch, false);
+  toggleSwitch(teachSwitch, true);
+
+  cpuLevel = cpuLevelSel.value;
+  teach = true;
+  explode = false;
+  vsCPU = false;
+
   newGame();
 })();
 </script>
