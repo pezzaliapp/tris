@@ -30,9 +30,34 @@
 }
 
 @media (max-width: 900px){
+
+  /* iOS: viewport stabile + safe-area */
   body{
     overflow-y:auto;
+    padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* layout in colonna */
+  .app{
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    padding: 14px !important;
+    gap: 14px !important;
+  }
+
+  /* canvas più grande e “usabile” */
+  #viewport{
+    height: 62svh !important;   /* svh = stabile su iOS Safari */
+    min-height: 420px !important;
+  }
+
+  /* controlli scrollabili sotto (se servono) */
+  .app > .panel:last-child{
+    max-height: none !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 
   .app{
     grid-template-columns:1fr;
@@ -804,9 +829,31 @@
   }
 
   // ===== CAMERA / GRID =====
- let theta=-0.7, phi=0.85, radius=10.5;
-let pan=[0,0,0];
+let theta = -0.7, phi = 0.95, radius = 10.8;
+let pan = [0, -0.55, 0];    // ✅ alza il cubo (target più basso = cubo più su)
 
+const IS_MOBILE = matchMedia('(max-width: 900px)').matches;
+
+/* ✅ su iPhone eri troppo vicino → qui aumentiamo la distanza iniziale */
+if (IS_MOBILE) {
+  radius = 14.2;            // più lontano = cubo intero e cliccabile
+  phi = 1.05;
+  theta = -0.62;
+}
+
+/* ✅ “recenter” automatico quando cambia dimensione (rotazione / barra Safari) */
+let __lastFitW = 0, __lastFitH = 0;
+function fitCameraToView(W, H){
+  if(!IS_MOBILE) return;
+  if(Math.abs(W-__lastFitW) < 40 && Math.abs(H-__lastFitH) < 40) return;
+  __lastFitW = W; __lastFitH = H;
+
+  // heuristic: più schermo “basso” = serve più distanza
+  const aspect = W / Math.max(1, H);
+  const base = 14.2;
+  radius = base + (aspect > 0.65 ? 0.0 : 2.2);  // portrait “stretto” → allontana
+  radius = clamp(radius, 12.5, 18.5);
+}
 /* ✅ mobile: camera più vicina (cubo più grande e giocabile) */
 if (window.matchMedia('(max-width: 900px)').matches) {
   radius = 8.2;
@@ -1288,6 +1335,7 @@ if (window.matchMedia('(max-width: 900px)').matches) {
   // ===== LOOP =====
   function tick(){
     const {W,H}=setCanvasSize();
+    fitCameraToView(W,H);
     const VP=getVP(W,H);
     const Wm=getWorld();
 
