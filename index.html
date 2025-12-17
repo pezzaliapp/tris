@@ -1220,72 +1220,103 @@
     if(vsCPU && current==='O') cpuMove();
   }
 
-  // INPUT (FIX iPhone: blocca scroll pagina durante drag)
-  let dragging=false, dragMode='rotate', lastX=0,lastY=0;
-  let mouseX=0, mouseY=0, mouseMoved=true;
+  // INPUT (FIX iPhone: tap per piazzare X/O + blocca scroll solo durante drag)
+let dragging=false, dragMode='rotate', lastX=0,lastY=0;
+let mouseX=0, mouseY=0, mouseMoved=true;
 
-  function stopPageScroll(e){
-    if(dragging) e.preventDefault();
-  }
-  canvas.addEventListener('touchmove', stopPageScroll, {passive:false});
-  canvas.addEventListener('touchstart', (e)=>e.preventDefault(), {passive:false});
+let downX=0, downY=0, movedDist=0;
+let downTime=0;
 
-  canvas.addEventListener('pointerdown',(e)=>{
-    dragging=true;
-    lastX=e.clientX; lastY=e.clientY;
-    dragMode = e.shiftKey ? 'pan' : 'rotate';
-    canvas.setPointerCapture(e.pointerId);
-  });
+function canvasToPickXY(clientX, clientY){
+  const rect=canvas.getBoundingClientRect();
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  const px=(clientX-rect.left)*dpr;
+  const py=(rect.height-(clientY-rect.top))*dpr; // Y invertita
+  return {px,py};
+}
 
-  function endPointer(e){
-    dragging=false;
-    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-  }
-  canvas.addEventListener('pointerup', endPointer);
-  canvas.addEventListener('pointercancel', endPointer);
+// blocca lo scroll pagina SOLO mentre trascini sul canvas
+canvas.addEventListener('touchmove', (e)=>{ if(dragging) e.preventDefault(); }, {passive:false});
 
-  canvas.addEventListener('pointermove',(e)=>{
-    const rect=canvas.getBoundingClientRect();
-    const dpr=Math.min(2, window.devicePixelRatio||1);
+canvas.addEventListener('pointerdown',(e)=>{
+  dragging=true;
+  lastX=e.clientX; lastY=e.clientY;
+  downX=e.clientX; downY=e.clientY;
+  movedDist=0;
+  downTime=performance.now();
 
-    if(dragging){
-      const dx=e.clientX-lastX, dy=e.clientY-lastY;
-      lastX=e.clientX; lastY=e.clientY;
+  // su mobile non c'è Shift: default rotate
+  dragMode = (e.shiftKey && !IS_MOBILE) ? 'pan' : 'rotate';
 
-      if(dragMode==='rotate'){
-        theta -= dx*0.007;
-        phi   -= dy*0.007;
-        phi = clamp(phi, 0.15, Math.PI-0.15);
-      }else{
-        const panSpeed = radius*0.0012;
-        pan[0] += -dx*panSpeed;
-        pan[1] +=  dy*panSpeed;
-      }
-      return;
-    }
+  canvas.setPointerCapture(e.pointerId);
 
-    mouseX=(e.clientX-rect.left)*dpr;
-    mouseY=(rect.height-(e.clientY-rect.top))*dpr;
-    mouseMoved=true;
-  });
+  // su iOS evita gesture di pagina durante touch
+  if(e.pointerType === 'touch') e.preventDefault();
+},{passive:false});
 
-  canvas.addEventListener('wheel',(e)=>{
-    e.preventDefault();
-    const delta=Math.sign(e.deltaY);
-    radius *= (delta>0)?1.08:0.92;
-    radius = clamp(radius, 6.2, 26);
-  },{passive:false});
+function endPointer(e){
+  if(!dragging) return;
 
-  canvas.addEventListener('click',(e)=>{
-    const rect=canvas.getBoundingClientRect();
-    const dpr=Math.min(2, window.devicePixelRatio||1);
-    const px=(e.clientX-rect.left)*dpr;
-    const py=(rect.height-(e.clientY-rect.top))*dpr;
-    const i=pickAt(px,py);
+  // “tap” = poco movimento + tempo breve
+  const isTap = (movedDist < 10) && ((performance.now()-downTime) < 600);
+
+  dragging=false;
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+
+  // su touch: piazza su pointerup (non su click)
+  if(e.pointerType === 'touch' && isTap){
+    const {px,py} = canvasToPickXY(e.clientX, e.clientY);
+    const i = pickAt(px,py);
     if(i!=null) play(i);
-  });
+  }
+}
+canvas.addEventListener('pointerup', endPointer, {passive:false});
+canvas.addEventListener('pointercancel', ()=>{ dragging=false; }, {passive:false});
 
-  // UI
+canvas.addEventListener('pointermove',(e)=>{
+  const rect=canvas.getBoundingClientRect();
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+
+  if(dragging){
+    const dx=e.clientX-lastX, dy=e.clientY-lastY;
+    lastX=e.clientX; lastY=e.clientY;
+
+    movedDist += Math.hypot(dx,dy);
+
+    if(dragMode==='rotate'){
+      theta -= dx*0.007;
+      phi   -= dy*0.007;
+      phi = clamp(phi, 0.15, Math.PI-0.15);
+    }else{
+      const panSpeed = radius*0.0012;
+      pan[0] += -dx*panSpeed;
+      pan[1] +=  dy*panSpeed;
+    }
+    return;
+  }
+
+  mouseX=(e.clientX-rect.left)*dpr;
+  mouseY=(rect.height-(e.clientY-rect.top))*dpr;
+  mouseMoved=true;
+});
+
+// zoom: wheel desktop
+canvas.addEventListener('wheel',(e)=>{
+  e.preventDefault();
+  const delta=Math.sign(e.deltaY);
+  radius *= (delta>0)?1.08:0.92;
+  radius = clamp(radius, 6.2, 26);
+},{passive:false});
+
+// click desktop (manteniamo click per mouse; su mobile gestiamo via pointerup)
+canvas.addEventListener('click',(e)=>{
+  if(IS_MOBILE) return;
+  const {px,py} = canvasToPickXY(e.clientX, e.clientY);
+  const i=pickAt(px,py);
+  if(i!=null) play(i);
+});
+
+// UI
   function buildZBar(){
     const items=[{t:'Tutti',v:null},{t:'Z0',v:0},{t:'Z1',v:1},{t:'Z2',v:2},{t:'Z3',v:3}];
     zbar.innerHTML='';
