@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Tris 3D vero — 4×4×4 (WebGL2, X/O mesh)</title>
   <style>
     :root{
@@ -21,12 +21,30 @@
         var(--bg);
       overflow:hidden;
     }
-    .app{height:100%;display:grid;grid-template-columns:1.25fr .75fr;gap:18px;padding:18px;}
-    @media (max-width: 1000px){
-      body{overflow:auto}
-      .app{grid-template-columns:1fr;height:auto;}
-      #viewport{height:60vh;}
-    }
+    .app{
+  min-height:100dvh;
+  display:grid;
+  grid-template-columns:1.25fr .75fr;
+  gap:18px;
+  padding:18px;
+}
+
+@media (max-width: 900px){
+  body{
+    overflow-y:auto;
+  }
+
+  .app{
+    grid-template-columns:1fr;
+    padding:12px;
+    gap:12px;
+  }
+
+  #viewport{
+    height:55vh;
+    min-height:320px;
+  }
+}
     .panel{
       border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden;
       background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
@@ -86,6 +104,19 @@
     .errorbox{position:absolute; inset:0; display:none; place-items:center; z-index:50; background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px;}
     .errorcard{width:min(720px,100%); border:1px solid rgba(255,255,255,.14); border-radius:18px; background: rgba(10,14,22,.72); padding:16px; box-shadow: var(--shadow);}
     .errorcard pre{white-space:pre-wrap;color: rgba(255,255,255,.85);background: rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;margin:10px 0 0;font-size:12px;line-height:1.4;}
+  
+  @media (max-width: 900px){
+  /* porta l'ultima section (Punteggio) in alto su mobile */
+  .panel .section:last-child{
+    order:-1;
+  }
+
+  /* abilita l'order dentro il pannello destro */
+  .panel{
+    display:flex;
+    flex-direction:column;
+  }
+}
   </style>
 </head>
 <body>
