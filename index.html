@@ -213,7 +213,8 @@
       </div>
     </div>
   </div>
-  <script>
+
+<script>
 (() => {
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   function showError(msg){
@@ -408,7 +409,8 @@
       current='X'; updateTurn(); setStatus('Tocca a X.');
     }, 220);
   }
-    // ===== WEBGL2 =====
+
+  // ===== WEBGL2 =====
   const canvas = document.getElementById('gl');
   const gl = canvas.getContext('webgl2', {antialias:true, alpha:true, depth:true});
   if(!gl){
@@ -466,7 +468,9 @@
       return m;
     }
   };
-    // ===== SHADERS =====
+
+  // ===== SHADERS =====
+  // ✅ FIX: aggiunta uniform uS (scale) per rendere X/O leggibili senza rifare pipeline
   const vsLit=`#version 300 es
   precision highp float;
   layout(location=0) in vec3 aPos;
@@ -479,6 +483,7 @@
 
   uniform mat4 uVP;
   uniform mat4 uW;
+  uniform float uS;   // <--- FIX
 
   out vec3 vN;
   out vec3 vP;
@@ -487,10 +492,11 @@
 
   void main(){
     vV=iVis;
-    vec4 p=uW*vec4(aPos+iT,1.0);
+    vec3 pLocal = aPos * uS;
+    vec4 p=uW*vec4(pLocal+iT,1.0);
     gl_Position=uVP*p;
     vP=p.xyz;
-    vN=mat3(uW)*aNor;
+    vN=mat3(uW)*(aNor);   // ok (scale uniforme, normale invariata)
     vC=iCol;
   }`;
 
@@ -552,7 +558,8 @@
     showError('Shader error:\n'+(e.message||String(e)));
     return;
   }
-    // ===== GEOMETRY HELPERS =====
+
+  // ===== GEOMETRY HELPERS =====
   function mergeMeshes(meshes){
     let totalV=0, totalI=0;
     for(const m of meshes){ totalV += m.pos.length/3; totalI += m.idx.length; }
@@ -591,20 +598,13 @@
   }
 
   function makeBox(w,h,d){
-    // centered box
     const x=w/2,y=h/2,z=d/2;
     const faces=[
-      // +X
       {nor:[ 1,0,0], v:[[ x,-y,-z],[ x, y,-z],[ x, y, z],[ x,-y, z]]},
-      // -X
       {nor:[-1,0,0], v:[[-x,-y, z],[-x, y, z],[-x, y,-z],[-x,-y,-z]]},
-      // +Y
       {nor:[0, 1,0], v:[[-x, y,-z],[-x, y, z],[ x, y, z],[ x, y,-z]]},
-      // -Y
       {nor:[0,-1,0], v:[[-x,-y, z],[-x,-y,-z],[ x,-y,-z],[ x,-y, z]]},
-      // +Z
       {nor:[0,0, 1], v:[[-x,-y, z],[ x,-y, z],[ x, y, z],[-x, y, z]]},
-      // -Z
       {nor:[0,0,-1], v:[[ x,-y,-z],[-x,-y,-z],[-x, y,-z],[ x, y,-z]]},
     ];
     const p=[], n=[], idx=[];
@@ -632,7 +632,6 @@
   }
 
   function makeXMesh(){
-    // due barre incrociate (tipo KubeApp)
     const bar = makeBox(0.85, 0.16, 0.10);
     const a = Math.PI/4;
     const b1 = rotateZ(bar, a);
@@ -653,7 +652,6 @@
         const y=(R + r*cv)*su;
         const z=r*sv;
 
-        // normal
         const nx=cv*cu;
         const ny=cv*su;
         const nz=sv;
@@ -676,7 +674,8 @@
   const GEO_CUBE = makeCube();
   const GEO_X    = makeXMesh();
   const GEO_O    = makeTorus(0.33, 0.095, 40, 20);
-    function makeVAO(geo, useUint32){
+
+  function makeVAO(geo, useUint32){
     const vao=gl.createVertexArray();
     gl.bindVertexArray(vao);
 
@@ -699,7 +698,6 @@
   const VAO_X    = makeVAO(GEO_X, true);
   const VAO_O    = makeVAO(GEO_O, true);
 
-  // instance buffers (shared format: iT vec3, iCol vec4, iVis float)
   function attachInstBuffers(vao, instT, instCol, instVis){
     gl.bindVertexArray(vao.vao);
 
@@ -721,18 +719,15 @@
 
   const INST=SIZE;
 
-  // cubes
   const cubeT=new Float32Array(INST*3);
   const cubeC=new Float32Array(INST*4);
   const cubeV=new Float32Array(INST);
   const cubePick=new Float32Array(INST*3);
 
-  // X mesh per cell
   const xT=new Float32Array(INST*3);
   const xC=new Float32Array(INST*4);
   const xV=new Float32Array(INST);
 
-  // O mesh per cell
   const oT=new Float32Array(INST*3);
   const oC=new Float32Array(INST*4);
   const oV=new Float32Array(INST);
@@ -741,21 +736,18 @@
   const BUF_X    = attachInstBuffers(VAO_X,    xT,    xC,    xV);
   const BUF_O    = attachInstBuffers(VAO_O,    oT,    oC,    oV);
 
-  // extra inst attrib for picking (solo cube)
   gl.bindVertexArray(VAO_CUBE.vao);
   const bPick=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bPick);
   gl.bufferData(gl.ARRAY_BUFFER, cubePick.byteLength, gl.DYNAMIC_DRAW);
   gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5,3,gl.FLOAT,false,0,0); gl.vertexAttribDivisor(5,1);
   gl.bindVertexArray(null);
 
-  // line VAO
   const vaoL=gl.createVertexArray(); gl.bindVertexArray(vaoL);
   const vboL=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboL);
   gl.bufferData(gl.ARRAY_BUFFER, 4096, gl.DYNAMIC_DRAW);
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
   gl.bindVertexArray(null);
 
-  // Picking FBO
   let pickFbo=null,pickTex=null,pickDepth=null,pickW=0,pickH=0;
   function ensurePickFbo(w,h){
     if(pickTex && pickW===w && pickH===h) return;
@@ -780,7 +772,8 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     if(st!==gl.FRAMEBUFFER_COMPLETE) showError('Picking FBO non completo: '+st);
   }
-    // ===== CAMERA / GRID =====
+
+  // ===== CAMERA / GRID =====
   let theta=-0.7, phi=0.85, radius=10.5;
   let pan=[0,0,0];
 
@@ -791,7 +784,6 @@
     return [x+pan[0], y+pan[1], z+pan[2]];
   }
   function getWorld(){
-    // leggero tilt “KubeApp-like”
     const rx=mat4.rotX(0.08), ry=mat4.rotY(-0.12);
     return mat4.mul(ry,rx);
   }
@@ -813,11 +805,14 @@
     return [r/255,g/255,b/255];
   }
 
+  // ✅ FIX: simboli un po’ più “grandi” e lift maggiore
+  const SYMBOL_SCALE = 0.78;
+  const SYMBOL_LIFT  = 0.12;
+
   function syncInstances(){
     for(let i=0;i<SIZE;i++){
       const p=pointOfIndex(i);
 
-      // cube
       cubeT[i*3+0]=p[0]; cubeT[i*3+1]=p[1]; cubeT[i*3+2]=p[2];
 
       const z=toXYZ(i).z;
@@ -829,16 +824,13 @@
       const rgb=encodeIdToRGB(i+1);
       cubePick[i*3+0]=rgb[0]; cubePick[i*3+1]=rgb[1]; cubePick[i*3+2]=rgb[2];
 
-      // X / O instance base (pos al centro cubo, leggermente “in avanti” per leggibilità)
-      const lift = 0.02; // tiny offset
-      xT[i*3+0]=p[0]; xT[i*3+1]=p[1]; xT[i*3+2]=p[2]+lift;
-      oT[i*3+0]=p[0]; oT[i*3+1]=p[1]; oT[i*3+2]=p[2]+lift;
+      // simboli
+      xT[i*3+0]=p[0]; xT[i*3+1]=p[1]; xT[i*3+2]=p[2]+SYMBOL_LIFT;
+      oT[i*3+0]=p[0]; oT[i*3+1]=p[1]; oT[i*3+2]=p[2]+SYMBOL_LIFT;
 
-      // colori (stabili)
       xC[i*4+0]=0.29; xC[i*4+1]=0.64; xC[i*4+2]=1.00; xC[i*4+3]=0.98;
       oC[i*4+0]=0.27; oC[i*4+1]=0.82; oC[i*4+2]=0.62; oC[i*4+3]=0.98;
 
-      // visibilità: solo se board[i]==X/O e il piano è visibile
       const planeOk = (planeZ===null || z===planeZ);
       xV[i] = (planeOk && board[i]==='X') ? 1.0 : 0.0;
       oV[i] = (planeOk && board[i]==='O') ? 1.0 : 0.0;
@@ -857,7 +849,8 @@
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,oC);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,oV);
   }
-    function clearPreview(){ previewLines=[]; }
+
+  function clearPreview(){ previewLines=[]; }
   function setPreviewForCell(i){
     clearPreview();
     if(!teach || gameOver || board[i]) return;
@@ -919,46 +912,52 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
   }
 
- function pickAt(px,py){
-  // FIX: se il picking non è pronto, non provare a leggere
-  if(!pickFbo || pickW<=0 || pickH<=0) return null;
+  function pickAt(px,py){
+    if(!pickFbo || pickW<=0 || pickH<=0) return null;
+    const x = clamp(px, 0, pickW - 1);
+    const y = clamp(py, 0, pickH - 1);
+    const buf = new Uint8Array(4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
+    gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const id = buf[0] + (buf[1] << 8) + (buf[2] << 16);
+    if(!id) return null;
+    const i = id - 1;
+    if(planeZ !== null && toXYZ(i).z !== planeZ) return null;
+    return i;
+  }
 
-  const x = clamp(px, 0, pickW - 1);
-  const y = clamp(py, 0, pickH - 1);
-
-  const buf = new Uint8Array(4);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
-  gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-  const id = buf[0] + (buf[1] << 8) + (buf[2] << 16);
-  if(!id) return null;
-
-  const i = id - 1;
-  if(planeZ !== null && toXYZ(i).z !== planeZ) return null;
-  return i;
-}
-  function drawLit(vaoObj, VP, Wm){
+  function drawLit(vaoObj, VP, Wm, scale){
     gl.bindVertexArray(vaoObj.vao);
     gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uVP'),false,VP);
     gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uW'),false,Wm);
+    gl.uniform1f(gl.getUniformLocation(PLIT,'uS'), scale);
     gl.drawElementsInstanced(gl.TRIANGLES, vaoObj.count, vaoObj.indexType, 0, INST);
     gl.bindVertexArray(null);
   }
 
   function drawMain(VP,Wm){
     gl.viewport(0,0,canvas.width,canvas.height);
-    gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0,0,0,0);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-    // cubi + simboli
+    // cubi: depth ON
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+
     gl.useProgram(PLIT);
-    drawLit(VAO_CUBE, VP, Wm);
-    drawLit(VAO_X, VP, Wm);
-    drawLit(VAO_O, VP, Wm);
+    drawLit(VAO_CUBE, VP, Wm, 1.0);
+
+    // ✅ FIX: simboli sempre visibili (depth OFF + no depth write)
+    gl.disable(gl.DEPTH_TEST);
+    gl.depthMask(false);
+    drawLit(VAO_X, VP, Wm, SYMBOL_SCALE);
+    drawLit(VAO_O, VP, Wm, SYMBOL_SCALE);
+
+    gl.depthMask(true);
+    gl.enable(gl.DEPTH_TEST);
     gl.useProgram(null);
 
     // linee didattiche + linea vittoria
@@ -993,7 +992,7 @@
 
   function place(i,who){
     board[i]=who;
-    syncInstances(); // aggiorna X/O visibilità
+    syncInstances();
     clearPreview();
   }
 
@@ -1026,7 +1025,7 @@
     if(vsCPU && current==='O') cpuMove();
   }
 
-  // ===== INPUT (orbit/pan/zoom + pick) =====
+  // ===== INPUT =====
   let dragging=false, dragMode='rotate', lastX=0,lastY=0;
   let mouseX=0, mouseY=0, mouseMoved=true;
 
@@ -1071,7 +1070,6 @@
     radius = clamp(radius, 5.2, 26);
   },{passive:false});
 
-  // click = pick al momento del click (no hoveredIndex “stale”)
   canvas.addEventListener('click',(e)=>{
     const rect=canvas.getBoundingClientRect();
     const dpr=Math.min(2, window.devicePixelRatio||1);
@@ -1080,7 +1078,8 @@
     const i=pickAt(px,py);
     if(i!=null) play(i);
   });
-    // ===== UI build Z =====
+
+  // ===== UI build Z =====
   function buildZBar(){
     const items=[{t:'Tutti',v:null},{t:'Z0',v:0},{t:'Z1',v:1},{t:'Z2',v:2},{t:'Z3',v:3}];
     zbar.innerHTML='';
@@ -1135,8 +1134,6 @@
     if(!teach) clearPreview();
   };
 
-  window.addEventListener('resize', ()=>{ /* canvas resize handled in tick */ });
-
   function newGame(){
     board=Array(SIZE).fill(null);
     current='X';
@@ -1156,10 +1153,8 @@
     const VP=getVP(W,H);
     const Wm=getWorld();
 
-    // picking pass
     drawPick(VP,Wm);
 
-    // hover preview
     if(mouseMoved){
       hoveredIndex = pickAt(mouseX, mouseY);
       if(teach && hoveredIndex!=null && canPlay(hoveredIndex)) setPreviewForCell(hoveredIndex);
@@ -1167,9 +1162,7 @@
       mouseMoved=false;
     }
 
-    // main render
     drawMain(VP,Wm);
-
     requestAnimationFrame(tick);
   }
 
