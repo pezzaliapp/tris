@@ -919,19 +919,25 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
   }
 
-  function pickAt(px,py){
-    const x=clamp(px,0,pickW-1), y=clamp(py,0,pickH-1);
-    const buf=new Uint8Array(4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,pickFbo);
-    gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,buf);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-    const id=buf[0]+(buf[1]<<8)+(buf[2]<<16);
-    if(!id) return null;
-    const i=id-1;
-    if(planeZ!==null && toXYZ(i).z!==planeZ) return null;
-    return i;
-  }
+ function pickAt(px,py){
+  // FIX: se il picking non è pronto, non provare a leggere
+  if(!pickFbo || pickW<=0 || pickH<=0) return null;
 
+  const x = clamp(px, 0, pickW - 1);
+  const y = clamp(py, 0, pickH - 1);
+
+  const buf = new Uint8Array(4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
+  gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  const id = buf[0] + (buf[1] << 8) + (buf[2] << 16);
+  if(!id) return null;
+
+  const i = id - 1;
+  if(planeZ !== null && toXYZ(i).z !== planeZ) return null;
+  return i;
+}
   function drawLit(vaoObj, VP, Wm){
     gl.bindVertexArray(vaoObj.vao);
     gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uVP'),false,VP);
