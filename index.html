@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Tris 3D vero (4×4×4) — WebGL</title>
+
   <style>
     :root{
       --bg:#070a10;
@@ -13,9 +14,6 @@
       --panel: rgba(18,26,39,.55);
       --shadow: 0 18px 55px rgba(0,0,0,.45);
       --radius: 18px;
-
-      --x:#4aa3ff;
-      --o:#44d19e;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -30,7 +28,6 @@
         var(--bg);
       overflow:hidden;
     }
-
     .app{
       height:100%;
       display:grid;
@@ -43,7 +40,6 @@
       .app{grid-template-columns: 1fr; height:auto;}
       #viewport{height:60vh;}
     }
-
     .panel{
       border: 1px solid var(--line);
       border-radius: var(--radius);
@@ -73,7 +69,6 @@
       white-space:nowrap;
     }
     .content{padding:18px}
-
     .status{
       display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
       padding:12px 14px;
@@ -94,18 +89,28 @@
       user-select:none;
       align-self:flex-start;
     }
-
     #viewport{
       width:100%;
-      height: calc(100% - 0px);
+      flex:1;
       min-height: 520px;
-      border-top: 1px solid rgba(255,255,255,.06);
-      border-bottom-left-radius: var(--radius);
-      border-bottom-right-radius: var(--radius);
-      overflow:hidden;
       position:relative;
+      overflow:hidden;
+      border-top: 1px solid rgba(255,255,255,.06);
     }
-
+    .hud{
+      position:absolute;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(0,0,0,.28);
+      border: 1px solid rgba(255,255,255,.10);
+      color: rgba(255,255,255,.88);
+      padding: 10px 12px;
+      border-radius: 14px;
+      font-size: 12px;
+      backdrop-filter: blur(8px);
+      pointer-events:none;
+      z-index:5;
+    }
     .controls{
       display:grid;
       grid-template-columns: 1fr 1fr;
@@ -120,10 +125,7 @@
       border-radius: 14px;
       cursor:pointer;
       font-weight: 950;
-      transition: transform .06s ease, background .2s ease, border-color .2s ease;
     }
-    .btn:hover{border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06)}
-    .btn:active{transform: scale(.99)}
     .btn.primary{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14)}
     .btn.danger{border-color: rgba(255,74,106,.35); background: rgba(255,74,106,.10)}
 
@@ -144,7 +146,6 @@
       background: rgba(0,0,0,.16);
       margin-bottom: 10px;
     }
-    .row:last-child{margin-bottom:0}
     label{font-size:13px;font-weight:950}
     input[type="range"]{ width: 200px; }
 
@@ -164,10 +165,10 @@
       background: rgba(255,255,255,.75);
       position:absolute;
       top: 2px; left: 2px;
-      transition: left .18s ease, background .18s ease;
+      transition: left .18s ease;
     }
     .switch.on{ border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14); }
-    .switch.on .knob{ left: 24px; background: rgba(255,255,255,.92); }
+    .switch.on .knob{ left: 24px; }
 
     .zbar{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
     .zbtn{
@@ -195,7 +196,6 @@
       cursor:pointer;
       min-width: 180px;
     }
-
     .score{
       display:grid;
       grid-template-columns: 1fr 1fr;
@@ -210,27 +210,11 @@
     .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
     .v{font-size:22px;font-weight:950}
     .hint{font-size:13px;color:var(--muted);line-height:1.5}
-
-    /* Small tooltip hint */
-    .hud{
-      position:absolute;
-      left: 12px;
-      bottom: 12px;
-      background: rgba(0,0,0,.28);
-      border: 1px solid rgba(255,255,255,.10);
-      color: rgba(255,255,255,.88);
-      padding: 10px 12px;
-      border-radius: 14px;
-      font-size: 12px;
-      backdrop-filter: blur(8px);
-      pointer-events:none;
-    }
   </style>
 </head>
-
 <body>
   <div class="app">
-    <!-- LEFT -->
+        <!-- LEFT -->
     <div class="panel" style="display:flex; flex-direction:column;">
       <div class="hdr">
         <div>
@@ -257,9 +241,7 @@
       </div>
 
       <div id="viewport">
-        <div class="hud">
-          Drag = ruota • Scroll = zoom • Shift+Drag = pan • Hover = preview linee (se ON)
-        </div>
+        <div class="hud">Drag = ruota • Scroll = zoom • Shift+Drag = pan • Hover = preview (se ON)</div>
       </div>
     </div>
 
@@ -277,8 +259,8 @@
         <h2>Vista</h2>
 
         <div class="row">
-          <label for="explodeRange">Profondità Z</label>
-          <input id="explodeRange" type="range" min="0.6" max="2.2" step="0.01" value="1.0" />
+          <label for="zDepth">Profondità Z</label>
+          <input id="zDepth" type="range" min="0.6" max="2.2" step="0.01" value="1.0" />
         </div>
 
         <div class="row">
@@ -358,37 +340,13 @@
       </div>
     </div>
   </div>
+    <script type="module">
+    // ✅ MODULI STABILI (OrbitControls qui funziona davvero)
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 
-  <!-- Three.js (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-
-  <script>
-  (() => {
     const N = 4;
     const SIZE = N*N*N;
-
-    // Board
-    let board = Array(SIZE).fill(null);
-    let current = 'X';
-    let gameOver = false;
-
-    // Modes
-    let vsCPU = false;
-    let cpuLevel = 'normal';
-    let teach = true;
-    let explode = false;
-    let zScale = 1.0;
-    let planeZ = null; // null=all else 0..3
-
-    // Scores
-    let score = {X:0, O:0};
-
-    // Win + preview
-    let winLine = null;     // indices[4]
-    let previewAnchor = null;
-    let previewLines = [];  // array of lines
-    let hoveredIndex = null;
 
     // UI refs
     const viewport = document.getElementById('viewport');
@@ -402,7 +360,7 @@
 
     const explodeSwitch = document.getElementById('explodeSwitch');
     const explodeBadge = document.getElementById('explodeBadge');
-    const explodeRange = document.getElementById('explodeRange');
+    const zDepth = document.getElementById('zDepth');
 
     const cpuSwitch = document.getElementById('cpuSwitch');
     const cpuBadge = document.getElementById('cpuBadge');
@@ -412,11 +370,25 @@
     const teachBadge = document.getElementById('teachBadge');
 
     const zbar = document.getElementById('zbar');
-
     const scoreXEl = document.getElementById('scoreX');
     const scoreOEl = document.getElementById('scoreO');
 
-    // helpers
+    // State
+    let board = Array(SIZE).fill(null);
+    let current = 'X';
+    let gameOver = false;
+
+    let vsCPU = false;
+    let cpuLevel = 'normal';
+    let teach = true;
+
+    let explode = false;
+    let zScale = 1.0;
+    let planeZ = null;
+
+    let score = { X:0, O:0 };
+
+    // Helpers
     const idx = (x,y,z) => z*N*N + y*N + x;
     const toXYZ = (i) => {
       const z = Math.floor(i / (N*N));
@@ -429,10 +401,7 @@
 
     function setStatus(msg){ statusText.innerHTML = `<strong>${msg}</strong>`; }
     function updateTurn(){ turnPill.textContent = `Turno: ${current}`; }
-    function updateScores(){
-      scoreXEl.textContent = score.X;
-      scoreOEl.textContent = score.O;
-    }
+    function updateScores(){ scoreXEl.textContent = score.X; scoreOEl.textContent = score.O; }
 
     // Winning lines
     function generateLines(n){
@@ -456,303 +425,190 @@
               const coords = [];
               let ok = true;
               for (let k=0; k<n; k++){
-                const xx = x + dx*k, yy = y + dy*k, zz = z + dz*k;
+                const xx=x+dx*k, yy=y+dy*k, zz=z+dz*k;
                 if (!inBounds(xx,yy,zz)) { ok=false; break; }
                 coords.push(idx(xx,yy,zz));
               }
               if (!ok) continue;
               if (inBounds(x-dx, y-dy, z-dz)) continue;
               const key = coords.join(',');
-              if (!set.has(key)){
-                set.add(key);
-                lines.push(coords);
-              }
+              if (!set.has(key)){ set.add(key); lines.push(coords); }
             }
           }
         }
       }
       return lines;
     }
+
     const WIN_LINES = generateLines(N);
     linesBadge.textContent = `Linee: ${WIN_LINES.length}`;
 
     const LINES_THROUGH = Array.from({length: SIZE}, () => []);
     for (const line of WIN_LINES) for (const c of line) LINES_THROUGH[c].push(line);
 
-    // Three.js setup
+    // ----- Three.js setup -----
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x070a10, 8, 30);
+    scene.fog = new THREE.Fog(0x070a10, 10, 40);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-    camera.position.set(9, 9, 11);
+    camera.position.set(9, 9, 12);
 
-    const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(viewport.clientWidth, viewport.clientHeight);
     viewport.appendChild(renderer.domElement);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.rotateSpeed = 0.6;
-    controls.zoomSpeed = 0.9;
-    controls.panSpeed = 0.6;
     controls.target.set(0,0,0);
     controls.update();
 
-    // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const key = new THREE.DirectionalLight(0xffffff, 0.9);
     key.position.set(8, 12, 10);
     scene.add(key);
 
-    const rim = new THREE.DirectionalLight(0x7aa7ff, 0.35);
-    rim.position.set(-10, 6, -10);
-    scene.add(rim);
-
-    // Axes helper (subtle, like KubeApp)
     const axes = new THREE.AxesHelper(6);
     axes.material.transparent = true;
     axes.material.opacity = 0.35;
     scene.add(axes);
 
-    // Materials
-    const matCell = new THREE.MeshPhysicalMaterial({
-      color: 0x1a202c,
-      metalness: 0.2,
-      roughness: 0.25,
-      transmission: 0.20,
-      transparent: true,
-      opacity: 0.85,
-      clearcoat: 0.35,
-      clearcoatRoughness: 0.25
-    });
-
-    const matCellDim = matCell.clone();
-    matCellDim.opacity = 0.35;
-
-    const matHover = matCell.clone();
-    matHover.color = new THREE.Color(0x23324a);
-    matHover.opacity = 0.95;
-
-    const matPreview = matCell.clone();
-    matPreview.color = new THREE.Color(0x2a3446);
-    matPreview.opacity = 0.92;
-
-    const matWin = matCell.clone();
-    matWin.color = new THREE.Color(0x2b3b55);
-    matWin.opacity = 1.0;
-
-    // Grid group
     const root = new THREE.Group();
     scene.add(root);
 
-    // Geometry
+    // --- cube geometry params ---
     const cellSize = 1.0;
     const gap = 0.22;
-    const baseSpacing = cellSize + gap; // xy spacing
-    let zSpacing = baseSpacing * 1.35;  // z spacing (scaled with slider/explode)
+    const baseSpacing = cellSize + gap;
+    let zSpacing = baseSpacing * 1.35;
+
     const cubeHalf = (N-1) * baseSpacing / 2;
 
-    // Map index -> mesh + marker
+    // meshes
     const cellMeshes = new Array(SIZE);
     const markerSprites = new Array(SIZE).fill(null);
 
-    // Lines (preview + win)
-    let previewLineObjs = [];
     let winLineObj = null;
+    let previewLineObjs = [];
 
-    function makeEdges(mesh){
-      const edges = new THREE.EdgesGeometry(mesh.geometry, 30);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-        color: 0xffffff,
-        transparent:true,
-        opacity: 0.18
-      }));
-      mesh.add(line);
+    // raycasting
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+          function pointOfIndex(i){
+      const {x,y,z} = toXYZ(i);
+      const px = (x * baseSpacing) - cubeHalf;
+      const py = ((N-1 - y) * baseSpacing) - cubeHalf;
+      const pz = ((N-1)/2 - z) * zSpacing;
+      return new THREE.Vector3(px, py, pz);
     }
 
     function markerSprite(letter, colorHex){
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 256;
       const ctx = canvas.getContext('2d');
+
       ctx.clearRect(0,0,256,256);
-
-      // soft glow
-      ctx.beginPath();
-      ctx.arc(128,128,92,0,Math.PI*2);
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fill();
-
       ctx.font = '900 170px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // stroke for contrast
       ctx.lineWidth = 18;
-      ctx.strokeStyle = 'rgba(0,0,0,0.38)';
-      ctx.strokeText(letter, 128, 138);
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.strokeText(letter, 128, 140);
 
       ctx.fillStyle = colorHex;
-      ctx.fillText(letter, 128, 138);
+      ctx.fillText(letter, 128, 140);
 
       const tex = new THREE.CanvasTexture(canvas);
-      tex.anisotropy = 8;
       tex.needsUpdate = true;
 
       const mat = new THREE.SpriteMaterial({
         map: tex,
         transparent: true,
         opacity: 0.98,
-        depthTest: true,
         depthWrite: false
       });
+
       const spr = new THREE.Sprite(mat);
-      spr.scale.set(0.85, 0.85, 0.85);
-      spr.position.set(0, 0, 0.62);
+      spr.scale.set(0.9, 0.9, 0.9);
+      spr.position.set(0, 0, 0.7);
       return spr;
     }
 
-    function clear3DLines(){
-      for (const l of previewLineObjs) { root.remove(l); }
+    function clearLines3D(){
+      for (const l of previewLineObjs) root.remove(l);
       previewLineObjs = [];
       if (winLineObj){ root.remove(winLineObj); winLineObj = null; }
     }
 
-    function pointOfIndex(i){
-      const {x,y,z} = toXYZ(i);
-      const px = (x * baseSpacing) - cubeHalf;
-      const py = ( (N-1 - y) * baseSpacing) - cubeHalf; // y inverted for nicer top-down
-      const pz = ( (N-1)/2 - z ) * zSpacing;
-      return new THREE.Vector3(px, py, pz);
-    }
-
-    function rebuildCube(){
-      // remove old meshes
+    function buildCube(){
       while (root.children.length) root.remove(root.children[0]);
-      clear3DLines();
+      clearLines3D();
 
-      // add cube cells
       const geom = new THREE.BoxGeometry(cellSize, cellSize, cellSize);
 
       for (let z=0; z<N; z++){
         for (let y=0; y<N; y++){
           for (let x=0; x<N; x++){
             const i = idx(x,y,z);
-            const mesh = new THREE.Mesh(geom, matCell.clone());
-            mesh.userData.index = i;
 
-            const p = pointOfIndex(i);
-            mesh.position.copy(p);
-
-            // Depth ghost effect: back layers more transparent
             const layerOpacity = [1.0, 0.78, 0.60, 0.45][z];
-            mesh.material.opacity = 0.85 * layerOpacity;
-            mesh.material.transmission = 0.20 * layerOpacity;
 
-            makeEdges(mesh);
+            const mat = new THREE.MeshStandardMaterial({
+              color: 0x1a202c,
+              metalness: 0.15,
+              roughness: 0.35,
+              transparent: true,
+              opacity: 0.85 * layerOpacity
+            });
+
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.userData.index = i;
+            mesh.position.copy(pointOfIndex(i));
+
+            // wire edges (KubeApp-ish)
+            const edges = new THREE.EdgesGeometry(geom, 30);
+            const eLine = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+              color: 0xffffff, transparent:true, opacity: 0.14
+            }));
+            mesh.add(eLine);
+
             root.add(mesh);
             cellMeshes[i] = mesh;
 
-            // restore marker if existing
+            // restore markers from board
             if (board[i]){
               const spr = markerSprite(board[i], board[i]==='X' ? '#4aa3ff' : '#44d19e');
               mesh.add(spr);
               markerSprites[i] = spr;
-            } else {
-              markerSprites[i] = null;
             }
           }
         }
       }
 
-      // apply plane filter + explode
       applyPlaneFilter();
       applyExplode();
-      applyMaterialsBase();
     }
 
     function applyExplode(){
-      // slider scales zSpacing; explode toggles multiplier
       const mult = explode ? 1.55 : 1.0;
       zSpacing = baseSpacing * 1.35 * zScale * mult;
 
-      for (let i=0; i<SIZE; i++){
-        const mesh = cellMeshes[i];
-        const p = pointOfIndex(i);
-        mesh.position.copy(p);
+      for (let i=0;i<SIZE;i++){
+        if (!cellMeshes[i]) continue;
+        cellMeshes[i].position.copy(pointOfIndex(i));
       }
-      // keep axes centered
-      axes.position.set(0,0,0);
-      clear3DLines();
+      clearLines3D();
     }
 
     function applyPlaneFilter(){
-      for (let i=0; i<SIZE; i++){
-        const mesh = cellMeshes[i];
+      for (let i=0;i<SIZE;i++){
         const {z} = toXYZ(i);
-        mesh.visible = (planeZ === null) ? true : (z === planeZ);
+        cellMeshes[i].visible = (planeZ === null) ? true : (z === planeZ);
       }
-      clear3DLines();
+      clearLines3D();
     }
-
-    function applyMaterialsBase(){
-      for (let i=0; i<SIZE; i++){
-        const mesh = cellMeshes[i];
-        if (!mesh) continue;
-        // keep base material as "cell"
-        // (we clone per mesh already)
-      }
-    }
-
-    function setCellMaterial(i, type){
-      const mesh = cellMeshes[i];
-      if (!mesh) return;
-      const {z} = toXYZ(i);
-
-      // restore base opacity by layer
-      const layerOpacity = [1.0, 0.78, 0.60, 0.45][z];
-      const base = matCell.clone();
-      base.opacity = 0.85 * layerOpacity;
-      base.transmission = 0.20 * layerOpacity;
-
-      if (type === 'base'){
-        mesh.material.dispose?.();
-        mesh.material = base;
-      } else if (type === 'hover'){
-        const m = matHover.clone();
-        m.opacity = 0.95;
-        mesh.material.dispose?.();
-        mesh.material = m;
-      } else if (type === 'preview'){
-        const m = matPreview.clone();
-        m.opacity = 0.92;
-        mesh.material.dispose?.();
-        mesh.material = m;
-      } else if (type === 'win'){
-        const m = matWin.clone();
-        m.opacity = 1.0;
-        mesh.material.dispose?.();
-        mesh.material = m;
-      } else if (type === 'dim'){
-        const m = matCellDim.clone();
-        m.opacity = 0.28;
-        mesh.material.dispose?.();
-        mesh.material = m;
-      }
-    }
-
-    function resetAllCellMaterials(){
-      for (let i=0; i<SIZE; i++){
-        if (!cellMeshes[i]) continue;
-        // if plane filter: dim invisible? we hide anyway, so just set base for visible
-        setCellMaterial(i, 'base');
-      }
-    }
-
-    // Raycasting for click/hover
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
 
     function setMouseFromEvent(ev){
       const rect = renderer.domElement.getBoundingClientRect();
@@ -763,152 +619,71 @@
     function pick(ev){
       setMouseFromEvent(ev);
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(root.children, false)
-        .filter(it => it.object.visible);
-
-      if (!intersects.length) return null;
-      // nearest
-      return intersects[0].object;
+      const hits = raycaster.intersectObjects(root.children, false).filter(h => h.object.visible);
+      return hits.length ? hits[0].object : null;
     }
 
-    // Preview line helpers
-    function linePotential(line, player){
-      const opp = (player === 'X') ? 'O' : 'X';
-      let p=0,o=0,e=0;
-      for (const c of line){
-        if (board[c] === player) p++;
-        else if (board[c] === opp) o++;
-        else e++;
+    function placeMark(i, player){
+      board[i] = player;
+      const mesh = cellMeshes[i];
+      if (!mesh) return;
+
+      if (markerSprites[i]){
+        mesh.remove(markerSprites[i]);
+        markerSprites[i] = null;
       }
-      if (p>0 && o>0) return 0;
-      if (p===3 && e===1) return 1000;
-      if (p===2 && e===2) return 80;
-      if (p===1 && e===3) return 10;
-      if (p===0 && e===4) return 2;
-      return 1;
+      const spr = markerSprite(player, player==='X' ? '#4aa3ff' : '#44d19e');
+      mesh.add(spr);
+      markerSprites[i] = spr;
     }
-
-    function clearPreview(){
-      previewAnchor = null;
-      previewLines = [];
-      clear3DLines();
-      resetAllCellMaterials();
-      if (winLine){
-        // keep win materials if game over
-        if (gameOver) {
-          for (const c of winLine) setCellMaterial(c, 'win');
+          function checkWinner(){
+      for (const line of WIN_LINES){
+        const a = board[line[0]];
+        if (!a) continue;
+        let ok = true;
+        for (let k=1;k<line.length;k++){
+          if (board[line[k]] !== a){ ok=false; break; }
         }
+        if (ok) return { winner:a, line };
       }
+      if (board.every(v=>v)) return { winner:'D', line:null };
+      return { winner:null, line:null };
     }
 
-    function draw3DLine(aIdx, bIdx, kind){
+    function drawLine3D(aIdx, bIdx, opacity){
       const A = pointOfIndex(aIdx);
       const B = pointOfIndex(bIdx);
-      const geom = new THREE.BufferGeometry().setFromPoints([A, B]);
-
-      const mat = new THREE.LineBasicMaterial({
-        color: (kind === 'win') ? 0xffffff : 0xffffff,
-        transparent: true,
-        opacity: (kind === 'win') ? 0.92 : 0.28
-      });
-
+      const geom = new THREE.BufferGeometry().setFromPoints([A,B]);
+      const mat = new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity });
       const line = new THREE.Line(geom, mat);
       line.renderOrder = 999;
       return line;
     }
 
-    function setPreviewForCell(i){
-      clearPreview();
-      if (!teach) return;
-      if (gameOver) return;
-      if (board[i]) return;
+    function clearPreview(){
+      clearLines3D();
+    }
 
-      previewAnchor = i;
+    function setPreview(i){
+      clearPreview();
+      if (!teach || gameOver || board[i]) return;
 
       let lines = LINES_THROUGH[i];
-      if (planeZ !== null){
-        lines = lines.filter(l => l.every(c => toXYZ(c).z === planeZ));
-      }
+      if (planeZ !== null) lines = lines.filter(l => l.every(c => toXYZ(c).z === planeZ));
 
-      const scored = lines
-        .map(l => ({line:l, score: linePotential(l, current)}))
-        .sort((a,b) => b.score - a.score)
-        .slice(0, 10)
-        .map(x => x.line);
+      // limita per non riempire lo schermo
+      lines = lines.slice(0, 10);
 
-      previewLines = scored;
-
-      // highlight cells in those lines
-      const set = new Set();
-      for (const l of previewLines) for (const c of l) set.add(c);
-
-      for (const c of set){
-        if (cellMeshes[c] && cellMeshes[c].visible) setCellMaterial(c, 'preview');
-      }
-      setCellMaterial(i, 'hover');
-
-      // 3D dashed-ish: use multiple short segments
-      for (const l of previewLines){
-        const a = l[0], b = l[3];
-        const obj = draw3DLine(a, b, 'prev');
+      for (const l of lines){
+        const obj = drawLine3D(l[0], l[3], 0.22);
         previewLineObjs.push(obj);
         root.add(obj);
       }
     }
 
-    function drawWinLine(line){
-      if (!line) return;
-      const a = line[0], b = line[3];
-      winLineObj = draw3DLine(a, b, 'win');
-      root.add(winLineObj);
-    }
-
-    // Game logic
-    function checkWinner(){
-      for (const line of WIN_LINES){
-        const a = board[line[0]];
-        if (!a) continue;
-        let ok = true;
-        for (let k=1; k<line.length; k++){
-          if (board[line[k]] !== a){ ok=false; break; }
-        }
-        if (ok) return { winner:a, line };
-      }
-      if (board.every(v => v)) return { winner:'D', line:null };
-      return { winner:null, line:null };
-    }
-
-    function lineInfoText(line){
-      const p0 = toXYZ(line[0]);
-      const p1 = toXYZ(line[1]);
-      const p3 = toXYZ(line[3]);
-      return `Linea: (${p0.x},${p0.y},${p0.z}) → (${p3.x},${p3.y},${p3.z}) dir (${p1.x-p0.x},${p1.y-p0.y},${p1.z-p0.z})`;
-    }
-
-    function canPlayIndex(i){
-      if (gameOver) return false;
-      if (board[i]) return false;
-      if (planeZ !== null && toXYZ(i).z !== planeZ) return false;
-      if (vsCPU && current === 'O') return false;
-      return true;
-    }
-
-    function placeMark(i, player){
-      board[i] = player;
-
-      const mesh = cellMeshes[i];
-      if (!mesh) return;
-      if (markerSprites[i]) { mesh.remove(markerSprites[i]); markerSprites[i] = null; }
-
-      const spr = markerSprite(player, player === 'X' ? '#4aa3ff' : '#44d19e');
-      mesh.add(spr);
-      markerSprites[i] = spr;
-    }
-
     function endGame(res){
       gameOver = true;
       clearPreview();
-      winLine = null;
 
       if (res.winner === 'D'){
         setStatus('Pareggio.');
@@ -916,27 +691,28 @@
       } else {
         setStatus(`Vince ${res.winner}! (4 in linea)`);
         score[res.winner]++; updateScores();
-        winLine = res.line.slice();
-        lineInfo.style.display = '';
-        lineInfo.textContent = lineInfoText(winLine);
 
-        // highlight winning cells
-        resetAllCellMaterials();
-        for (const c of winLine) setCellMaterial(c, 'win');
-        clear3DLines();
-        drawWinLine(winLine);
+        lineInfo.style.display = '';
+        const p0 = toXYZ(res.line[0]);
+        const p3 = toXYZ(res.line[3]);
+        lineInfo.textContent = `Linea: (${p0.x},${p0.y},${p0.z}) → (${p3.x},${p3.y},${p3.z})`;
+
+        winLineObj = drawLine3D(res.line[0], res.line[3], 0.9);
+        root.add(winLineObj);
       }
       updateTurn();
     }
 
-    function nextTurn(){
-      current = (current === 'X') ? 'O' : 'X';
-      updateTurn();
-      setStatus(`Tocca a ${current}.`);
+    function canPlay(i){
+      if (gameOver) return false;
+      if (board[i]) return false;
+      if (planeZ !== null && toXYZ(i).z !== planeZ) return false;
+      if (vsCPU && current === 'O') return false;
+      return true;
     }
 
-    function playIndex(i){
-      if (!canPlayIndex(i)) return;
+    function play(i){
+      if (!canPlay(i)) return;
 
       placeMark(i, current);
       clearPreview();
@@ -944,72 +720,19 @@
       const res = checkWinner();
       if (res.winner){ endGame(res); return; }
 
-      nextTurn();
+      current = (current==='X') ? 'O' : 'X';
+      setStatus(`Tocca a ${current}.`);
+      updateTurn();
 
       if (vsCPU && current === 'O') cpuMove();
     }
 
-    // CPU
     function empties(){
       const e=[];
       for (let i=0;i<SIZE;i++){
-        if (!board[i]){
-          if (planeZ===null || toXYZ(i).z === planeZ) e.push(i);
-        }
+        if (!board[i] && (planeZ===null || toXYZ(i).z===planeZ)) e.push(i);
       }
       return e;
-    }
-
-    function findImmediateWinMove(player){
-      const e=empties();
-      for (const i of e){
-        board[i]=player;
-        const res=checkWinner();
-        board[i]=null;
-        if (res.winner===player) return i;
-      }
-      return null;
-    }
-
-    function bestHeuristicMove(player){
-      const e = empties();
-      if (!e.length) return null;
-
-      if (cpuLevel === 'easy'){
-        return e[Math.floor(Math.random()*e.length)];
-      }
-
-      const win = findImmediateWinMove(player);
-      if (win!=null) return win;
-
-      const opp = (player==='X') ? 'O' : 'X';
-      const block = findImmediateWinMove(opp);
-      if (block!=null) return block;
-
-      let best={i:e[0], score:-1e9};
-
-      for (const i of e){
-        let sum=0;
-        for (const line of LINES_THROUGH[i]){
-          if (planeZ !== null && !line.every(c=>toXYZ(c).z===planeZ)) continue;
-          sum += linePotential(line, player);
-        }
-
-        // center bias
-        const p = toXYZ(i);
-        const cb = (1.5 - Math.abs(p.x-1.5)) + (1.5 - Math.abs(p.y-1.5)) + (1.5 - Math.abs(p.z-1.5));
-        sum += cb*2;
-
-        if (cpuLevel === 'hard'){
-          board[i]=player;
-          const oppWin = findImmediateWinMove(opp);
-          if (oppWin!=null) sum -= 500;
-          board[i]=null;
-        }
-
-        if (sum > best.score) best={i, score:sum};
-      }
-      return best.i;
     }
 
     function cpuMove(){
@@ -1017,21 +740,42 @@
       setStatus('CPU sta pensando…');
 
       setTimeout(() => {
-        const m = bestHeuristicMove('O');
-        if (m==null) return;
+        const e = empties();
+        if (!e.length) return;
 
-        placeMark(m, 'O');
+        // semplice ma divertente: random + tenta chiusura
+        const win = e.find(i => {
+          board[i]='O'; const r=checkWinner(); board[i]=null;
+          return r.winner==='O';
+        });
+        const block = e.find(i => {
+          board[i]='X'; const r=checkWinner(); board[i]=null;
+          return r.winner==='X';
+        });
+
+        let move = win ?? block ?? e[Math.floor(Math.random()*e.length)];
+        if (cpuLevel === 'hard'){
+          // hard: preferisci centro
+          move = e.sort((a,b)=>{
+            const pa=toXYZ(a), pb=toXYZ(b);
+            const ca = (1.5-Math.abs(pa.x-1.5))+(1.5-Math.abs(pa.y-1.5))+(1.5-Math.abs(pa.z-1.5));
+            const cb = (1.5-Math.abs(pb.x-1.5))+(1.5-Math.abs(pb.y-1.5))+(1.5-Math.abs(pb.z-1.5));
+            return cb-ca;
+          })[0];
+        }
+
+        placeMark(move, 'O');
 
         const res = checkWinner();
         if (res.winner){ endGame(res); return; }
 
         current = 'X';
-        updateTurn();
         setStatus('Tocca a X.');
+        updateTurn();
       }, 240);
     }
 
-    // UI: switches
+    // UI toggles
     function toggleSwitch(el, state){
       if (state === undefined) el.classList.toggle('on');
       else el.classList.toggle('on', !!state);
@@ -1039,137 +783,97 @@
       return el.classList.contains('on');
     }
 
-    // Z selector
     function buildZBar(){
       const items = [
-        { label:'Tutti', value:null },
-        { label:'Z0', value:0 },
-        { label:'Z1', value:1 },
-        { label:'Z2', value:2 },
-        { label:'Z3', value:3 },
+        {label:'Tutti', v:null},
+        {label:'Z0', v:0},{label:'Z1', v:1},{label:'Z2', v:2},{label:'Z3', v:3},
       ];
       zbar.innerHTML='';
       for (const it of items){
         const b=document.createElement('button');
         b.className='zbtn';
-        b.type='button';
         b.textContent=it.label;
-        b.addEventListener('click', () => {
-          planeZ = it.value;
-          syncZBar();
-          applyPlaneFilter();
-          clearPreview();
-        });
+        b.onclick=()=>{ planeZ=it.v; syncZBar(); applyPlaneFilter(); };
         zbar.appendChild(b);
       }
       syncZBar();
     }
     function syncZBar(){
-      [...zbar.querySelectorAll('.zbtn')].forEach(b => b.classList.remove('active'));
-      const buttons = [...zbar.querySelectorAll('.zbtn')];
-      for (const b of buttons){
-        const txt = b.textContent;
-        const v = (txt==='Tutti') ? null : Number(txt.slice(1));
-        if (v === planeZ) b.classList.add('active');
-        if (v === null && planeZ === null) b.classList.add('active');
-      }
+      [...zbar.querySelectorAll('.zbtn')].forEach(b=>b.classList.remove('active'));
+      [...zbar.querySelectorAll('.zbtn')].forEach(b=>{
+        const t=b.textContent;
+        const v=(t==='Tutti')?null:Number(t.slice(1));
+        if ((v===null && planeZ===null) || v===planeZ) b.classList.add('active');
+      });
     }
 
-    // events
+    // events (3D)
     renderer.domElement.addEventListener('pointerdown', (ev) => {
       const obj = pick(ev);
       if (!obj) return;
-      const i = obj.userData.index;
-      playIndex(i);
+      play(obj.userData.index);
     });
 
     renderer.domElement.addEventListener('pointermove', (ev) => {
       const obj = pick(ev);
-      const i = obj ? obj.userData.index : null;
-
-      if (i === hoveredIndex) return;
-
-      hoveredIndex = i;
-      if (i == null){
-        clearPreview();
-        return;
-      }
-      // only preview if cell is playable/empty
-      if (teach && !board[i] && (planeZ===null || toXYZ(i).z===planeZ) && !gameOver){
-        setPreviewForCell(i);
-      } else {
-        clearPreview();
-      }
+      if (!obj){ clearPreview(); return; }
+      const i = obj.userData.index;
+      if (teach && canPlay(i)) setPreview(i);
+      else clearPreview();
     });
 
-    resetBtn.addEventListener('click', () => newGame());
-    resetScoreBtn.addEventListener('click', () => { score={X:0,O:0}; updateScores(); newGame(); });
+    // UI wiring
+    resetBtn.onclick = () => newGame();
+    resetScoreBtn.onclick = () => { score={X:0,O:0}; updateScores(); newGame(); };
 
-    explodeSwitch.addEventListener('click', () => {
+    explodeSwitch.onclick = () => {
       explode = toggleSwitch(explodeSwitch);
       explodeBadge.textContent = explode ? 'ON' : 'OFF';
       applyExplode();
-    });
-    explodeBadge.textContent = 'OFF';
+    };
 
-    explodeRange.addEventListener('input', () => {
-      zScale = Number(explodeRange.value);
+    zDepth.addEventListener('input', () => {
+      zScale = Number(zDepth.value);
       applyExplode();
     });
 
-    cpuSwitch.addEventListener('click', () => {
+    cpuSwitch.onclick = () => {
       vsCPU = toggleSwitch(cpuSwitch);
       cpuBadge.textContent = vsCPU ? 'ON' : 'OFF';
-      if (vsCPU && current === 'O' && !gameOver) cpuMove();
-    });
-    cpuBadge.textContent = 'OFF';
+      if (vsCPU && current==='O' && !gameOver) cpuMove();
+    };
+    cpuLevelSel.onchange = () => cpuLevel = cpuLevelSel.value;
 
-    cpuLevelSel.addEventListener('change', () => cpuLevel = cpuLevelSel.value);
-
-    teachSwitch.addEventListener('click', () => {
+    teachSwitch.onclick = () => {
       teach = toggleSwitch(teachSwitch);
       teachBadge.textContent = teach ? 'ON' : 'OFF';
       if (!teach) clearPreview();
-    });
-    teachBadge.textContent = 'ON';
+    };
 
     // resize
     function onResize(){
       const w = viewport.clientWidth;
       const h = viewport.clientHeight;
-      camera.aspect = w / h;
+      camera.aspect = w/h;
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      renderer.setSize(w,h);
     }
     window.addEventListener('resize', onResize);
 
-    // game reset
     function newGame(){
       board = Array(SIZE).fill(null);
       current = 'X';
       gameOver = false;
-      winLine = null;
-      lineInfo.style.display = 'none';
-      clearPreview();
-
-      // remove markers
-      for (let i=0;i<SIZE;i++){
-        if (markerSprites[i] && cellMeshes[i]){
-          cellMeshes[i].remove(markerSprites[i]);
-        }
-        markerSprites[i]=null;
-      }
-
+      lineInfo.style.display='none';
       setStatus('Tocca a X.');
       updateTurn();
-      rebuildCube();
+      buildCube();
     }
 
-    // animate
-    function tick(){
+    function animate(){
       controls.update();
-      renderer.render(scene, camera);
-      requestAnimationFrame(tick);
+      renderer.render(scene,camera);
+      requestAnimationFrame(animate);
     }
 
     // init
@@ -1177,10 +881,12 @@
     updateScores();
     setStatus('Tocca a X.');
     updateTurn();
-    rebuildCube();
+    buildCube();
     onResize();
-    tick();
-  })();
+    animate();
+
+    // quick sanity log (se non vedi nulla, apri console)
+    console.log("Tris 3D WebGL OK — THREE:", THREE.REVISION);
   </script>
 </body>
 </html>
