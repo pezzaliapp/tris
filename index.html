@@ -3,153 +3,224 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tris — HTML single file</title>
+  <title>Tris 3D vero (4×4×4) — single file</title>
   <style>
     :root{
-      --bg:#0b0f17;
-      --card:#121a27;
-      --card2:#0f1622;
+      --bg:#070a10;
       --text:#e9eef7;
       --muted:#9fb0c8;
-      --accent:#4aa3ff;
-      --danger:#ff4a6a;
-      --ok:#44d19e;
-      --line:rgba(255,255,255,.10);
-      --shadow: 0 12px 35px rgba(0,0,0,.35);
+      --line: rgba(255,255,255,.12);
+      --panel: rgba(18,26,39,.55);
+      --shadow: 0 18px 55px rgba(0,0,0,.45);
       --radius: 18px;
+
+      --x:#4aa3ff;
+      --o:#44d19e;
+
+      --cellBg1: rgba(255,255,255,.07);
+      --cellBg2: rgba(0,0,0,.15);
     }
     *{box-sizing:border-box}
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      background: radial-gradient(1200px 700px at 20% 10%, rgba(74,163,255,.20), transparent 55%),
-                  radial-gradient(900px 700px at 80% 20%, rgba(68,209,158,.16), transparent 55%),
-                  radial-gradient(1100px 800px at 60% 90%, rgba(255,74,106,.10), transparent 60%),
-                  var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding: 24px;
-    }
-    .app{
-      width:min(960px, 100%);
+      min-height:100vh;
       display:grid;
-      grid-template-columns: 1.05fr .95fr;
-      gap: 18px;
+      place-items:center;
+      padding:24px;
+      background:
+        radial-gradient(1100px 700px at 20% 10%, rgba(74,163,255,.18), transparent 55%),
+        radial-gradient(900px 700px at 80% 25%, rgba(68,209,158,.14), transparent 55%),
+        radial-gradient(1000px 800px at 60% 90%, rgba(255,255,255,.06), transparent 60%),
+        var(--bg);
     }
-    @media (max-width: 820px){
-      .app{grid-template-columns: 1fr}
+
+    .app{
+      width:min(1100px, 100%);
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:18px;
     }
+    @media (max-width: 940px){ .app{grid-template-columns: 1fr;} }
+
     .panel{
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
       border: 1px solid var(--line);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow:hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      backdrop-filter: blur(10px);
     }
-    .panel-header{
-      padding: 18px 18px 12px 18px;
+    .hdr{
+      padding:18px 18px 12px;
+      border-bottom:1px solid var(--line);
+      background: rgba(18,26,39,.55);
       display:flex;
       align-items:flex-start;
       justify-content:space-between;
       gap:12px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(18,26,39,.55);
-      backdrop-filter: blur(10px);
     }
-    .title{
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    }
-    h1{
-      font-size: 18px;
-      margin:0;
-      letter-spacing:.2px;
-    }
-    .subtitle{
-      font-size: 13px;
-      color: var(--muted);
-    }
+    h1{margin:0;font-size:18px;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.3}
     .badge{
-      font-size: 12px;
-      color: var(--muted);
-      border: 1px solid var(--line);
-      padding: 6px 10px;
-      border-radius: 999px;
+      font-size:12px;
+      color:var(--muted);
+      border:1px solid var(--line);
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.18);
       white-space:nowrap;
-      background: rgba(0,0,0,.18);
     }
-    .content{
-      padding: 18px;
-    }
+    .content{padding:18px}
 
-    /* Board */
-    .board-wrap{
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap: 14px;
-    }
     .status{
-      width: 100%;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 12px;
-      padding: 12px 14px;
-      border: 1px solid var(--line);
-      border-radius: 14px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:14px;
       background: rgba(0,0,0,.18);
+      margin-bottom:14px;
     }
-    .status strong{font-weight:650}
-    .status .pill{
+    .status .mini{color:var(--muted);font-size:12px}
+    .status strong{font-weight:850}
+    .pill{
       font-size:12px;
       padding:6px 10px;
-      border-radius: 999px;
+      border-radius:999px;
       border:1px solid var(--line);
-      color: var(--muted);
+      color:var(--muted);
       background: rgba(255,255,255,.03);
       user-select:none;
     }
-    .grid{
-      width: min(420px, 100%);
+
+    /* -------- 3D stage -------- */
+    .stage{
+      display:grid;
+      place-items:center;
+      padding: 10px 0 4px;
+    }
+    .perspective{
+      perspective: 1100px;
+      width: min(560px, 100%);
       aspect-ratio: 1 / 1;
       display:grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      padding: 10px;
+      place-items:center;
+      position:relative;
+    }
+    .cube{
+      width: 100%;
+      height: 100%;
+      position:relative;
+      transform-style: preserve-3d;
+      transform: rotateX(var(--rx, 18deg)) rotateY(var(--ry, -22deg));
+      transition: transform .25s ease;
+      filter: drop-shadow(0 26px 60px rgba(0,0,0,.55));
+    }
+
+    .platform{
+      position:absolute;
+      inset: 0;
+      border-radius: 22px;
+      background:
+        radial-gradient(700px 420px at 35% 20%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
+      border: 1px solid rgba(255,255,255,.14);
+      transform: translateZ(-26px);
+    }
+    .platform::after{
+      content:"";
+      position:absolute;
+      inset: 14px;
       border-radius: 18px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.16);
+    }
+
+    .layer{
+      position:absolute;
+      inset: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.08);
+      transform-style: preserve-3d;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+    }
+    .layer .layerLabel{
+      position:absolute;
+      top:10px;
+      left:10px;
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,.10);
       background: rgba(0,0,0,.18);
-    }
-    .cell{
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size: clamp(38px, 6.4vw, 64px);
-      font-weight: 750;
-      letter-spacing: 1px;
-      cursor:pointer;
+      padding: 5px 8px;
+      border-radius: 999px;
       user-select:none;
-      transition: transform .06s ease, border-color .15s ease, background .2s ease, opacity .2s ease;
+      backdrop-filter: blur(6px);
     }
-    .cell:hover{transform: translateY(-1px); border-color: rgba(74,163,255,.45)}
-    .cell:active{transform: translateY(0px) scale(.99)}
-    .cell[disabled]{
-      cursor: not-allowed;
-      opacity: .75;
+
+    .grid{
+      width: 100%;
+      height: 100%;
+      padding: 42px 18px 18px;
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      transform-style: preserve-3d;
     }
-    .cell.x{color: var(--accent)}
-    .cell.o{color: var(--ok)}
+
+    .cell{
+      appearance:none;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      background:
+        radial-gradient(240px 140px at 30% 20%, var(--cellBg1), rgba(255,255,255,.02)),
+        linear-gradient(180deg, rgba(255,255,255,.06), var(--cellBg2));
+      color: var(--text);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      font-size: clamp(26px, 4.3vw, 44px);
+      font-weight: 900;
+      letter-spacing: 1px;
+      transform-style: preserve-3d;
+      box-shadow:
+        0 10px 20px rgba(0,0,0,.35),
+        inset 0 1px 0 rgba(255,255,255,.10);
+      transition: transform .08s ease, border-color .2s ease, filter .2s ease, opacity .2s ease;
+      user-select:none;
+      position: relative;
+      overflow:hidden;
+    }
+    .cell:hover{
+      border-color: rgba(74,163,255,.45);
+      transform: translateZ(6px);
+      filter: brightness(1.05);
+    }
+    .cell:active{ transform: translateZ(2px) scale(.99); filter: brightness(.98); }
+    .cell[disabled]{ cursor:not-allowed; opacity:.82; }
+
+    .cell.x{ color: var(--x); }
+    .cell.o{ color: var(--o); }
+
+    .token{
+      transform: translateZ(18px) scale(.90);
+      opacity: 0;
+      animation: pop .16s ease forwards;
+      text-shadow: 0 12px 24px rgba(0,0,0,.45);
+    }
+    @keyframes pop{ to{ transform: translateZ(24px) scale(1); opacity:1; } }
+
     .cell.win{
-      border-color: rgba(255,255,255,.38);
-      background: radial-gradient(400px 200px at 50% 10%, rgba(255,255,255,.14), rgba(255,255,255,.04));
+      border-color: rgba(255,255,255,.55);
+      box-shadow:
+        0 14px 30px rgba(0,0,0,.38),
+        0 0 0 2px rgba(255,255,255,.10),
+        inset 0 1px 0 rgba(255,255,255,.14);
+      filter: brightness(1.08);
       opacity: 1;
     }
 
@@ -158,51 +229,34 @@
       display:grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      width: 100%;
-      max-width: 420px;
+      margin-top: 14px;
     }
     .btn{
-      appearance:none;
       border:1px solid var(--line);
       background: rgba(255,255,255,.04);
       color: var(--text);
       padding: 11px 12px;
       border-radius: 14px;
       cursor:pointer;
-      font-weight: 650;
+      font-weight: 850;
       transition: transform .06s ease, background .2s ease, border-color .2s ease;
     }
     .btn:hover{border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06)}
     .btn:active{transform: scale(.99)}
-    .btn.primary{
-      border-color: rgba(74,163,255,.35);
-      background: rgba(74,163,255,.14);
-    }
-    .btn.danger{
-      border-color: rgba(255,74,106,.35);
-      background: rgba(255,74,106,.10);
-    }
-    .btn:disabled{opacity:.55; cursor:not-allowed}
+    .btn.primary{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14)}
+    .btn.danger{border-color: rgba(255,74,106,.35); background: rgba(255,74,106,.10)}
 
-    /* Side panel */
-    .section{
-      padding: 16px 18px;
-      border-top: 1px solid var(--line);
-    }
-    .section:first-child{border-top:none}
+    .section{padding:16px 18px; border-top:1px solid var(--line)}
     .section h2{
-      margin:0 0 10px 0;
+      margin:0 0 10px;
       font-size: 14px;
       letter-spacing:.2px;
       color: var(--muted);
-      font-weight: 700;
+      font-weight: 900;
       text-transform: uppercase;
     }
     .row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 12px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
       padding: 10px 12px;
       border-radius: 14px;
       border: 1px solid var(--line);
@@ -210,155 +264,137 @@
       margin-bottom: 10px;
     }
     .row:last-child{margin-bottom:0}
-    .row label{
-      font-size: 13px;
-      color: var(--text);
-      font-weight: 650;
+    label{font-size:13px;font-weight:900}
+    input[type="range"]{ width: 200px; }
+    .toggle{
+      display:flex; align-items:center; gap:10px;
+      user-select:none;
     }
-    select{
+    .switch{
+      width: 46px; height: 26px;
+      border-radius: 999px;
+      border:1px solid var(--line);
       background: rgba(255,255,255,.04);
-      color: var(--text);
-      border: 1px solid var(--line);
-      padding: 9px 10px;
-      border-radius: 12px;
-      font-weight: 650;
+      position:relative;
       cursor:pointer;
-      min-width: 190px;
+      flex: 0 0 auto;
     }
+    .knob{
+      width: 20px; height: 20px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.75);
+      position:absolute;
+      top: 2px; left: 2px;
+      transition: left .18s ease, background .18s ease;
+    }
+    .switch.on{ border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14); }
+    .switch.on .knob{ left: 24px; background: rgba(255,255,255,.92); }
+
     .score{
       display:grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    .score .card{
+    .card{
       border: 1px solid var(--line);
       border-radius: 16px;
       background: rgba(0,0,0,.16);
       padding: 12px;
     }
-    .score .k{
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: .3px;
-      font-weight: 750;
-    }
-    .score .v{
-      font-size: 22px;
-      font-weight: 800;
-    }
-    .hint{
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-    .mini{
-      font-size: 12px;
-      color: var(--muted);
-    }
-    a{color: var(--accent)}
+    .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
+    .v{font-size:22px;font-weight:950}
+    .hint{font-size:13px;color:var(--muted);line-height:1.5}
+    .mini{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- LEFT: game -->
+    <!-- LEFT -->
     <div class="panel">
-      <div class="panel-header">
-        <div class="title">
-          <h1>Tris</h1>
-          <div class="subtitle">Single file • HTML/CSS/JS • pronto da provare</div>
+      <div class="hdr">
+        <div>
+          <h1>Tris 3D vero — 4×4×4</h1>
+          <div class="sub">Metti <b>4 in linea</b> nello spazio (anche tra livelli). Due giocatori locali.</div>
         </div>
-        <div class="badge" id="modeBadge">Modalità: CPU</div>
+        <div class="badge" id="linesBadge">Linee vincenti: …</div>
       </div>
 
       <div class="content">
-        <div class="board-wrap">
-          <div class="status" aria-live="polite">
-            <div>
-              <div class="mini">Stato</div>
-              <div id="statusText"><strong>Tocca una casella</strong></div>
+        <div class="status" aria-live="polite">
+          <div>
+            <div class="mini">Stato</div>
+            <div id="statusText"><strong>Tocca una casella</strong></div>
+          </div>
+          <div class="pill" id="turnPill">Turno: X</div>
+        </div>
+
+        <div class="stage">
+          <div class="perspective">
+            <div class="cube" id="cube">
+              <div class="platform"></div>
+              <!-- layers injected -->
             </div>
-            <div class="pill" id="turnPill">Turno: X</div>
           </div>
+        </div>
 
-          <div class="grid" id="grid" role="grid" aria-label="Griglia del tris">
-            <!-- cells injected -->
-          </div>
-
-          <div class="controls">
-            <button class="btn primary" id="resetBtn">Nuova partita</button>
-            <button class="btn danger" id="resetScoreBtn" title="Azzera punteggio">Azzera punteggio</button>
-          </div>
+        <div class="controls">
+          <button class="btn primary" id="resetBtn">Nuova partita</button>
+          <button class="btn danger" id="resetScoreBtn">Azzera punteggio</button>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT: settings/score -->
+    <!-- RIGHT -->
     <div class="panel">
-      <div class="panel-header">
-        <div class="title">
-          <h1>Impostazioni</h1>
-          <div class="subtitle">Cambia modalità e difficoltà</div>
+      <div class="hdr">
+        <div>
+          <h1>Vista</h1>
+          <div class="sub">Ruota il “cubo” e separa i livelli.</div>
         </div>
-        <div class="badge" id="difficultyBadge">Difficoltà: Normale</div>
+        <div class="badge" id="viewBadge">3D</div>
       </div>
 
       <div class="section">
-        <h2>Giocatori</h2>
+        <h2>Controlli 3D</h2>
 
         <div class="row">
-          <label for="modeSel">Modalità</label>
-          <select id="modeSel">
-            <option value="cpu">Vs CPU</option>
-            <option value="pvp">2 giocatori</option>
-          </select>
-        </div>
-
-        <div class="row" id="difficultyRow">
-          <label for="diffSel">Difficoltà CPU</label>
-          <select id="diffSel">
-            <option value="easy">Facile</option>
-            <option value="normal" selected>Normale</option>
-            <option value="hard">Difficile</option>
-            <option value="impossible">Impossibile</option>
-          </select>
+          <label for="rx">Rotazione X</label>
+          <input id="rx" type="range" min="-35" max="35" value="18" />
         </div>
 
         <div class="row">
-          <label for="firstSel">Inizia</label>
-          <select id="firstSel">
-            <option value="X" selected>X</option>
-            <option value="O">O</option>
-          </select>
+          <label for="ry">Rotazione Y</label>
+          <input id="ry" type="range" min="-55" max="55" value="-22" />
+        </div>
+
+        <div class="row">
+          <div class="toggle">
+            <div class="switch" id="explodeSwitch" role="switch" aria-checked="false" tabindex="0">
+              <div class="knob"></div>
+            </div>
+            <div>
+              <div style="font-weight:900;font-size:13px">Esplodi livelli</div>
+              <div class="mini">Separa Z=0..3 per leggere meglio</div>
+            </div>
+          </div>
+          <div class="badge" id="explodeBadge">OFF</div>
         </div>
       </div>
 
       <div class="section">
         <h2>Punteggio</h2>
         <div class="score">
-          <div class="card">
-            <div class="k">X</div>
-            <div class="v" id="scoreX">0</div>
-          </div>
-          <div class="card">
-            <div class="k">Pareggi</div>
-            <div class="v" id="scoreD">0</div>
-          </div>
-          <div class="card">
-            <div class="k">O</div>
-            <div class="v" id="scoreO">0</div>
-          </div>
+          <div class="card"><div class="k">X</div><div class="v" id="scoreX">0</div></div>
+          <div class="card"><div class="k">O</div><div class="v" id="scoreO">0</div></div>
         </div>
       </div>
 
       <div class="section">
         <h2>Note</h2>
         <div class="hint">
-          • Clicca per giocare.<br/>
-          • In modalità CPU, l’IA gioca con <b>O</b>.<br/>
-          • “Impossibile” usa minimax (non perde mai).<br/>
-          <span class="mini">Suggerimento: puoi anche salvare questo file e metterlo su GitHub Pages.</span>
+          • Ogni casella è <b>(x,y,z)</b> con x,y,z da 0 a 3.<br/>
+          • Vittoria: 4 uguali in una linea (qualunque direzione).<br/>
+          • Vuoi anche la modalità <b>CPU</b> o <b>online</b>? La aggiungiamo.
         </div>
       </div>
     </div>
@@ -366,305 +402,260 @@
 
 <script>
 (() => {
-  // --- State ---
-  const WIN_LINES = [
-    [0,1,2],[3,4,5],[6,7,8],
-    [0,3,6],[1,4,7],[2,5,8],
-    [0,4,8],[2,4,6]
-  ];
+  const N = 4; // 4x4x4
+  const SIZE = N*N*N;
 
-  let board = Array(9).fill(null);
+  // Board: null | 'X' | 'O'
+  let board = Array(SIZE).fill(null);
   let current = 'X';
   let gameOver = false;
-  let winningLine = null;
 
-  let mode = 'cpu';       // cpu | pvp
-  let difficulty = 'normal'; // easy | normal | hard | impossible
-  let first = 'X';        // X | O
+  let score = { X:0, O:0 };
 
-  let score = { X: 0, O: 0, D: 0 };
-
-  // --- DOM ---
-  const grid = document.getElementById('grid');
+  // UI refs
+  const cube = document.getElementById('cube');
   const statusText = document.getElementById('statusText');
   const turnPill = document.getElementById('turnPill');
 
   const resetBtn = document.getElementById('resetBtn');
   const resetScoreBtn = document.getElementById('resetScoreBtn');
 
-  const modeSel = document.getElementById('modeSel');
-  const diffSel = document.getElementById('diffSel');
-  const firstSel = document.getElementById('firstSel');
-
-  const difficultyRow = document.getElementById('difficultyRow');
-  const modeBadge = document.getElementById('modeBadge');
-  const difficultyBadge = document.getElementById('difficultyBadge');
-
   const scoreX = document.getElementById('scoreX');
   const scoreO = document.getElementById('scoreO');
-  const scoreD = document.getElementById('scoreD');
 
-  // --- Helpers ---
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const rx = document.getElementById('rx');
+  const ry = document.getElementById('ry');
+
+  const explodeSwitch = document.getElementById('explodeSwitch');
+  const explodeBadge = document.getElementById('explodeBadge');
+
+  const linesBadge = document.getElementById('linesBadge');
+
+  // ---------- helpers ----------
+  const idx = (x,y,z) => z*N*N + y*N + x;
+  const inBounds = (x,y,z) => x>=0 && x<N && y>=0 && y<N && z>=0 && z<N;
 
   function setStatus(msg, strong=false){
     statusText.innerHTML = strong ? `<strong>${msg}</strong>` : msg;
   }
 
-  function updateBadges(){
-    modeBadge.textContent = `Modalità: ${mode === 'cpu' ? 'CPU' : '2 giocatori'}`;
-    const map = { easy: 'Facile', normal:'Normale', hard:'Difficile', impossible:'Impossibile' };
-    difficultyBadge.textContent = `Difficoltà: ${map[difficulty]}`;
-    difficultyRow.style.display = (mode === 'cpu') ? '' : 'none';
-  }
-
   function updateScores(){
     scoreX.textContent = score.X;
     scoreO.textContent = score.O;
-    scoreD.textContent = score.D;
+  }
+
+  function updateCubeRotation(){
+    cube.style.setProperty('--rx', rx.value + 'deg');
+    cube.style.setProperty('--ry', ry.value + 'deg');
+  }
+
+  // Generate ALL unique winning lines of length N in NxNxN
+  function generateLines(n){
+    const dirs = [];
+    for (let dx=-1; dx<=1; dx++){
+      for (let dy=-1; dy<=1; dy++){
+        for (let dz=-1; dz<=1; dz++){
+          if (dx===0 && dy===0 && dz===0) continue;
+
+          // Canonical direction to avoid duplicates:
+          // Keep only directions where the first non-zero component is positive.
+          // (lexicographic)
+          const firstNonZero = (dx!==0) ? dx : (dy!==0 ? dy : dz);
+          if (firstNonZero < 0) continue;
+
+          dirs.push([dx,dy,dz]);
+        }
+      }
+    }
+
+    const set = new Set();
+    const lines = [];
+
+    for (let z=0; z<n; z++){
+      for (let y=0; y<n; y++){
+        for (let x=0; x<n; x++){
+          for (const [dx,dy,dz] of dirs){
+            // build line starting at (x,y,z)
+            const coords = [];
+            let ok = true;
+            for (let k=0; k<n; k++){
+              const xx = x + dx*k;
+              const yy = y + dy*k;
+              const zz = z + dz*k;
+              if (!inBounds(xx,yy,zz)){ ok=false; break; }
+              coords.push(idx(xx,yy,zz));
+            }
+            if (!ok) continue;
+
+            // Ensure this is the minimal start for this direction (avoid same line shifted)
+            const px = x - dx;
+            const py = y - dy;
+            const pz = z - dz;
+            if (inBounds(px,py,pz)) continue;
+
+            const key = coords.join(',');
+            if (!set.has(key)){
+              set.add(key);
+              lines.push(coords);
+            }
+          }
+        }
+      }
+    }
+    return lines;
+  }
+
+  const WIN_LINES = generateLines(N);
+  linesBadge.textContent = `Linee vincenti: ${WIN_LINES.length}`;
+
+  // ---------- rendering ----------
+  function clearLayers(){
+    // remove existing .layer nodes (keep .platform)
+    [...cube.querySelectorAll('.layer')].forEach(n => n.remove());
   }
 
   function render(){
-    grid.innerHTML = '';
-    for (let i=0;i<9;i++){
-      const btn = document.createElement('button');
-      btn.className = 'cell';
-      btn.type = 'button';
-      btn.setAttribute('role','gridcell');
-      btn.setAttribute('aria-label', `Casella ${i+1}`);
-      const v = board[i];
-      if (v){
-        btn.textContent = v;
-        btn.classList.add(v.toLowerCase());
-        btn.disabled = true;
-      } else {
-        btn.textContent = '';
-        btn.disabled = gameOver || (mode==='cpu' && current==='O'); // block while CPU turn
+    clearLayers();
+
+    const exploded = explodeSwitch.classList.contains('on');
+    const zGap = exploded ? 70 : 24; // px depth spacing
+
+    for (let z=0; z<N; z++){
+      const layer = document.createElement('div');
+      layer.className = 'layer';
+      layer.style.transform = `translateZ(${(z - (N-1)/2) * zGap}px)`;
+
+      const label = document.createElement('div');
+      label.className = 'layerLabel';
+      label.textContent = `Livello Z=${z}`;
+      layer.appendChild(label);
+
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+
+      for (let y=0; y<N; y++){
+        for (let x=0; x<N; x++){
+          const i = idx(x,y,z);
+          const btn = document.createElement('button');
+          btn.className = 'cell';
+          btn.type = 'button';
+          btn.setAttribute('aria-label', `Casella x${x} y${y} z${z}`);
+
+          const v = board[i];
+          if (v){
+            btn.classList.add(v.toLowerCase());
+            btn.disabled = true;
+            const span = document.createElement('span');
+            span.className = 'token';
+            span.textContent = v;
+            btn.appendChild(span);
+          } else {
+            btn.disabled = gameOver;
+          }
+
+          // win highlight
+          if (winSet && winSet.has(i)) btn.classList.add('win');
+
+          btn.addEventListener('click', () => play(i));
+          grid.appendChild(btn);
+        }
       }
 
-      if (winningLine && winningLine.includes(i)){
-        btn.classList.add('win');
-      }
-
-      btn.addEventListener('click', () => humanMove(i));
-      grid.appendChild(btn);
+      layer.appendChild(grid);
+      cube.appendChild(layer);
     }
+
     turnPill.textContent = `Turno: ${current}`;
+    explodeBadge.textContent = exploded ? 'ON' : 'OFF';
   }
 
-  function getWinner(b){
+  // ---------- game logic ----------
+  let winSet = null;
+
+  function checkWinner(){
     for (const line of WIN_LINES){
-      const [a,c,d] = line;
-      if (b[a] && b[a] === b[c] && b[a] === b[d]){
-        return { winner: b[a], line };
+      const a = board[line[0]];
+      if (!a) continue;
+      let ok = true;
+      for (let k=1; k<line.length; k++){
+        if (board[line[k]] !== a){ ok=false; break; }
+      }
+      if (ok){
+        return { winner: a, line };
       }
     }
-    if (b.every(x => x)) return { winner: 'D', line: null }; // draw
+    // draw if full
+    if (board.every(v => v)) return { winner: 'D', line: null };
     return { winner: null, line: null };
   }
 
-  function startNewGame(){
-    board = Array(9).fill(null);
-    current = first;
-    gameOver = false;
-    winningLine = null;
-    setStatus(mode==='cpu'
-      ? (current==='O' ? 'La CPU inizia…' : 'Tocca a te.')
-      : `Inizia ${current}.`
-    , true);
-    render();
-    if (mode === 'cpu' && current === 'O') cpuTurn();
-  }
-
-  function endGame(result){
+  function endGame(res){
     gameOver = true;
-    if (result.winner === 'D'){
-      score.D++;
-      setStatus('Pareggio.', true);
+
+    if (res.winner === 'D'){
+      setStatus('Pareggio (griglia piena).', true);
+      winSet = null;
     } else {
-      score[result.winner]++;
-      winningLine = result.line;
-      setStatus(`Vince ${result.winner}!`, true);
+      score[res.winner]++;
+      updateScores();
+      setStatus(`Vince ${res.winner}! (4 in linea)`, true);
+      winSet = new Set(res.line);
     }
-    updateScores();
     render();
   }
 
-  // --- Moves ---
-  async function humanMove(i){
+  function play(i){
     if (gameOver) return;
     if (board[i]) return;
-    // Human is always the current player; in CPU mode, human is X.
+
     board[i] = current;
 
-    const result = getWinner(board);
-    if (result.winner){
-      endGame(result);
+    const res = checkWinner();
+    if (res.winner){
+      endGame(res);
       return;
     }
 
     current = (current === 'X') ? 'O' : 'X';
+    setStatus(`Tocca a ${current}.`, true);
+    winSet = null;
     render();
-
-    if (mode === 'cpu' && current === 'O'){
-      await cpuTurn();
-    } else {
-      setStatus(`Tocca a ${current}.`, true);
-    }
   }
 
-  async function cpuTurn(){
-    if (gameOver) return;
-    setStatus('La CPU sta pensando…', true);
-    render();
-
-    // small delay for UX
-    await sleep(220);
-
-    const i = pickCpuMove(board, difficulty);
-    if (i == null) return;
-
-    board[i] = 'O';
-
-    const result = getWinner(board);
-    if (result.winner){
-      endGame(result);
-      return;
-    }
-
+  function newGame(){
+    board = Array(SIZE).fill(null);
     current = 'X';
-    setStatus('Tocca a te.', true);
+    gameOver = false;
+    winSet = null;
+    setStatus('Tocca a X. (Obiettivo: 4 in linea)', true);
     render();
   }
 
-  // --- CPU AI ---
-  function emptyIndices(b){
-    const res = [];
-    for (let i=0;i<b.length;i++) if (!b[i]) res.push(i);
-    return res;
+  // ---------- UI events ----------
+  rx.addEventListener('input', updateCubeRotation);
+  ry.addEventListener('input', updateCubeRotation);
+
+  function toggleExplode(){
+    explodeSwitch.classList.toggle('on');
+    explodeSwitch.setAttribute('aria-checked', explodeSwitch.classList.contains('on') ? 'true' : 'false');
+    render();
   }
+  explodeSwitch.addEventListener('click', toggleExplode);
+  explodeSwitch.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExplode(); }
+  });
 
-  function randomMove(b){
-    const empties = emptyIndices(b);
-    if (!empties.length) return null;
-    return empties[Math.floor(Math.random() * empties.length)];
-  }
-
-  function findWinningMove(b, player){
-    for (const i of emptyIndices(b)){
-      const copy = b.slice();
-      copy[i] = player;
-      if (getWinner(copy).winner === player) return i;
-    }
-    return null;
-  }
-
-  function heuristicMove(b){
-    // 1) win
-    let m = findWinningMove(b, 'O');
-    if (m != null) return m;
-    // 2) block
-    m = findWinningMove(b, 'X');
-    if (m != null) return m;
-    // 3) center
-    if (!b[4]) return 4;
-    // 4) corners
-    const corners = [0,2,6,8].filter(i => !b[i]);
-    if (corners.length) return corners[Math.floor(Math.random()*corners.length)];
-    // 5) sides
-    const sides = [1,3,5,7].filter(i => !b[i]);
-    if (sides.length) return sides[Math.floor(Math.random()*sides.length)];
-    return null;
-  }
-
-  function pickCpuMove(b, diff){
-    if (diff === 'easy') return randomMove(b);
-
-    if (diff === 'normal'){
-      // 70% heuristic, 30% random
-      if (Math.random() < 0.7) return heuristicMove(b);
-      return randomMove(b);
-    }
-
-    if (diff === 'hard'){
-      // 92% heuristic, 8% random
-      if (Math.random() < 0.92) return heuristicMove(b);
-      return randomMove(b);
-    }
-
-    // impossible: minimax
-    return minimaxBestMove(b, 'O');
-  }
-
-  function minimaxBestMove(b, player){
-    // player: whose turn now
-    const res = minimax(b, player);
-    return res.move;
-  }
-
-  function minimax(b, player){
-    const outcome = getWinner(b);
-    if (outcome.winner === 'O') return { score:  10, move: null };
-    if (outcome.winner === 'X') return { score: -10, move: null };
-    if (outcome.winner === 'D') return { score:   0, move: null };
-
-    const moves = emptyIndices(b);
-    let best = { score: (player === 'O' ? -Infinity : Infinity), move: moves[0] };
-
-    for (const i of moves){
-      const copy = b.slice();
-      copy[i] = player;
-      const nextPlayer = (player === 'O') ? 'X' : 'O';
-      const child = minimax(copy, nextPlayer);
-
-      // prefer faster wins / slower losses: add depth bias
-      const depthBias = moves.length; // smaller when deeper
-      const score = child.score + (player === 'O' ? 0.01*depthBias : -0.01*depthBias);
-
-      if (player === 'O'){
-        if (score > best.score){
-          best = { score, move: i };
-        }
-      } else {
-        if (score < best.score){
-          best = { score, move: i };
-        }
-      }
-    }
-    return best;
-  }
-
-  // --- Events ---
-  resetBtn.addEventListener('click', startNewGame);
+  resetBtn.addEventListener('click', newGame);
   resetScoreBtn.addEventListener('click', () => {
-    score = { X: 0, O: 0, D: 0 };
+    score = { X:0, O:0 };
     updateScores();
-    startNewGame();
+    newGame();
   });
 
-  modeSel.addEventListener('change', () => {
-    mode = modeSel.value;
-    updateBadges();
-    startNewGame();
-  });
-
-  diffSel.addEventListener('change', () => {
-    difficulty = diffSel.value;
-    updateBadges();
-    startNewGame();
-  });
-
-  firstSel.addEventListener('change', () => {
-    first = firstSel.value;
-    startNewGame();
-  });
-
-  // --- Init ---
-  updateBadges();
+  // ---------- init ----------
   updateScores();
-
-  // Build initial grid buttons once (render does it)
-  startNewGame();
+  updateCubeRotation();
+  newGame();
 })();
 </script>
 </body>
