@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tris — HTML single file</title>
+  <style>
+    :root{
+      --bg:#0b0f17;
+      --card:#121a27;
+      --card2:#0f1622;
+      --text:#e9eef7;
+      --muted:#9fb0c8;
+      --accent:#4aa3ff;
+      --danger:#ff4a6a;
+      --ok:#44d19e;
+      --line:rgba(255,255,255,.10);
+      --shadow: 0 12px 35px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 700px at 20% 10%, rgba(74,163,255,.20), transparent 55%),
+                  radial-gradient(900px 700px at 80% 20%, rgba(68,209,158,.16), transparent 55%),
+                  radial-gradient(1100px 800px at 60% 90%, rgba(255,74,106,.10), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 24px;
+    }
+    .app{
+      width:min(960px, 100%);
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 18px;
+    }
+    @media (max-width: 820px){
+      .app{grid-template-columns: 1fr}
+    }
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .panel-header{
+      padding: 18px 18px 12px 18px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(18,26,39,.55);
+      backdrop-filter: blur(10px);
+    }
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    h1{
+      font-size: 18px;
+      margin:0;
+      letter-spacing:.2px;
+    }
+    .subtitle{
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .badge{
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 999px;
+      white-space:nowrap;
+      background: rgba(0,0,0,.18);
+    }
+    .content{
+      padding: 18px;
+    }
+
+    /* Board */
+    .board-wrap{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap: 14px;
+    }
+    .status{
+      width: 100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(0,0,0,.18);
+    }
+    .status strong{font-weight:650}
+    .status .pill{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius: 999px;
+      border:1px solid var(--line);
+      color: var(--muted);
+      background: rgba(255,255,255,.03);
+      user-select:none;
+    }
+    .grid{
+      width: min(420px, 100%);
+      aspect-ratio: 1 / 1;
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 10px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,.18);
+    }
+    .cell{
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: clamp(38px, 6.4vw, 64px);
+      font-weight: 750;
+      letter-spacing: 1px;
+      cursor:pointer;
+      user-select:none;
+      transition: transform .06s ease, border-color .15s ease, background .2s ease, opacity .2s ease;
+    }
+    .cell:hover{transform: translateY(-1px); border-color: rgba(74,163,255,.45)}
+    .cell:active{transform: translateY(0px) scale(.99)}
+    .cell[disabled]{
+      cursor: not-allowed;
+      opacity: .75;
+    }
+    .cell.x{color: var(--accent)}
+    .cell.o{color: var(--ok)}
+    .cell.win{
+      border-color: rgba(255,255,255,.38);
+      background: radial-gradient(400px 200px at 50% 10%, rgba(255,255,255,.14), rgba(255,255,255,.04));
+      opacity: 1;
+    }
+
+    /* Controls */
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .btn{
+      appearance:none;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 11px 12px;
+      border-radius: 14px;
+      cursor:pointer;
+      font-weight: 650;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+    }
+    .btn:hover{border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06)}
+    .btn:active{transform: scale(.99)}
+    .btn.primary{
+      border-color: rgba(74,163,255,.35);
+      background: rgba(74,163,255,.14);
+    }
+    .btn.danger{
+      border-color: rgba(255,74,106,.35);
+      background: rgba(255,74,106,.10);
+    }
+    .btn:disabled{opacity:.55; cursor:not-allowed}
+
+    /* Side panel */
+    .section{
+      padding: 16px 18px;
+      border-top: 1px solid var(--line);
+    }
+    .section:first-child{border-top:none}
+    .section h2{
+      margin:0 0 10px 0;
+      font-size: 14px;
+      letter-spacing:.2px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,.16);
+      margin-bottom: 10px;
+    }
+    .row:last-child{margin-bottom:0}
+    .row label{
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 650;
+    }
+    select{
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      border-radius: 12px;
+      font-weight: 650;
+      cursor:pointer;
+      min-width: 190px;
+    }
+    .score{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+    .score .card{
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(0,0,0,.16);
+      padding: 12px;
+    }
+    .score .k{
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      font-weight: 750;
+    }
+    .score .v{
+      font-size: 22px;
+      font-weight: 800;
+    }
+    .hint{
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .mini{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    a{color: var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: game -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="title">
+          <h1>Tris</h1>
+          <div class="subtitle">Single file • HTML/CSS/JS • pronto da provare</div>
+        </div>
+        <div class="badge" id="modeBadge">Modalità: CPU</div>
+      </div>
+
+      <div class="content">
+        <div class="board-wrap">
+          <div class="status" aria-live="polite">
+            <div>
+              <div class="mini">Stato</div>
+              <div id="statusText"><strong>Tocca una casella</strong></div>
+            </div>
+            <div class="pill" id="turnPill">Turno: X</div>
+          </div>
+
+          <div class="grid" id="grid" role="grid" aria-label="Griglia del tris">
+            <!-- cells injected -->
+          </div>
+
+          <div class="controls">
+            <button class="btn primary" id="resetBtn">Nuova partita</button>
+            <button class="btn danger" id="resetScoreBtn" title="Azzera punteggio">Azzera punteggio</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: settings/score -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="title">
+          <h1>Impostazioni</h1>
+          <div class="subtitle">Cambia modalità e difficoltà</div>
+        </div>
+        <div class="badge" id="difficultyBadge">Difficoltà: Normale</div>
+      </div>
+
+      <div class="section">
+        <h2>Giocatori</h2>
+
+        <div class="row">
+          <label for="modeSel">Modalità</label>
+          <select id="modeSel">
+            <option value="cpu">Vs CPU</option>
+            <option value="pvp">2 giocatori</option>
+          </select>
+        </div>
+
+        <div class="row" id="difficultyRow">
+          <label for="diffSel">Difficoltà CPU</label>
+          <select id="diffSel">
+            <option value="easy">Facile</option>
+            <option value="normal" selected>Normale</option>
+            <option value="hard">Difficile</option>
+            <option value="impossible">Impossibile</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label for="firstSel">Inizia</label>
+          <select id="firstSel">
+            <option value="X" selected>X</option>
+            <option value="O">O</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Punteggio</h2>
+        <div class="score">
+          <div class="card">
+            <div class="k">X</div>
+            <div class="v" id="scoreX">0</div>
+          </div>
+          <div class="card">
+            <div class="k">Pareggi</div>
+            <div class="v" id="scoreD">0</div>
+          </div>
+          <div class="card">
+            <div class="k">O</div>
+            <div class="v" id="scoreO">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Note</h2>
+        <div class="hint">
+          • Clicca per giocare.<br/>
+          • In modalità CPU, l’IA gioca con <b>O</b>.<br/>
+          • “Impossibile” usa minimax (non perde mai).<br/>
+          <span class="mini">Suggerimento: puoi anche salvare questo file e metterlo su GitHub Pages.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // --- State ---
+  const WIN_LINES = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  let board = Array(9).fill(null);
+  let current = 'X';
+  let gameOver = false;
+  let winningLine = null;
+
+  let mode = 'cpu';       // cpu | pvp
+  let difficulty = 'normal'; // easy | normal | hard | impossible
+  let first = 'X';        // X | O
+
+  let score = { X: 0, O: 0, D: 0 };
+
+  // --- DOM ---
+  const grid = document.getElementById('grid');
+  const statusText = document.getElementById('statusText');
+  const turnPill = document.getElementById('turnPill');
+
+  const resetBtn = document.getElementById('resetBtn');
+  const resetScoreBtn = document.getElementById('resetScoreBtn');
+
+  const modeSel = document.getElementById('modeSel');
+  const diffSel = document.getElementById('diffSel');
+  const firstSel = document.getElementById('firstSel');
+
+  const difficultyRow = document.getElementById('difficultyRow');
+  const modeBadge = document.getElementById('modeBadge');
+  const difficultyBadge = document.getElementById('difficultyBadge');
+
+  const scoreX = document.getElementById('scoreX');
+  const scoreO = document.getElementById('scoreO');
+  const scoreD = document.getElementById('scoreD');
+
+  // --- Helpers ---
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  function setStatus(msg, strong=false){
+    statusText.innerHTML = strong ? `<strong>${msg}</strong>` : msg;
+  }
+
+  function updateBadges(){
+    modeBadge.textContent = `Modalità: ${mode === 'cpu' ? 'CPU' : '2 giocatori'}`;
+    const map = { easy: 'Facile', normal:'Normale', hard:'Difficile', impossible:'Impossibile' };
+    difficultyBadge.textContent = `Difficoltà: ${map[difficulty]}`;
+    difficultyRow.style.display = (mode === 'cpu') ? '' : 'none';
+  }
+
+  function updateScores(){
+    scoreX.textContent = score.X;
+    scoreO.textContent = score.O;
+    scoreD.textContent = score.D;
+  }
+
+  function render(){
+    grid.innerHTML = '';
+    for (let i=0;i<9;i++){
+      const btn = document.createElement('button');
+      btn.className = 'cell';
+      btn.type = 'button';
+      btn.setAttribute('role','gridcell');
+      btn.setAttribute('aria-label', `Casella ${i+1}`);
+      const v = board[i];
+      if (v){
+        btn.textContent = v;
+        btn.classList.add(v.toLowerCase());
+        btn.disabled = true;
+      } else {
+        btn.textContent = '';
+        btn.disabled = gameOver || (mode==='cpu' && current==='O'); // block while CPU turn
+      }
+
+      if (winningLine && winningLine.includes(i)){
+        btn.classList.add('win');
+      }
+
+      btn.addEventListener('click', () => humanMove(i));
+      grid.appendChild(btn);
+    }
+    turnPill.textContent = `Turno: ${current}`;
+  }
+
+  function getWinner(b){
+    for (const line of WIN_LINES){
+      const [a,c,d] = line;
+      if (b[a] && b[a] === b[c] && b[a] === b[d]){
+        return { winner: b[a], line };
+      }
+    }
+    if (b.every(x => x)) return { winner: 'D', line: null }; // draw
+    return { winner: null, line: null };
+  }
+
+  function startNewGame(){
+    board = Array(9).fill(null);
+    current = first;
+    gameOver = false;
+    winningLine = null;
+    setStatus(mode==='cpu'
+      ? (current==='O' ? 'La CPU inizia…' : 'Tocca a te.')
+      : `Inizia ${current}.`
+    , true);
+    render();
+    if (mode === 'cpu' && current === 'O') cpuTurn();
+  }
+
+  function endGame(result){
+    gameOver = true;
+    if (result.winner === 'D'){
+      score.D++;
+      setStatus('Pareggio.', true);
+    } else {
+      score[result.winner]++;
+      winningLine = result.line;
+      setStatus(`Vince ${result.winner}!`, true);
+    }
+    updateScores();
+    render();
+  }
+
+  // --- Moves ---
+  async function humanMove(i){
+    if (gameOver) return;
+    if (board[i]) return;
+    // Human is always the current player; in CPU mode, human is X.
+    board[i] = current;
+
+    const result = getWinner(board);
+    if (result.winner){
+      endGame(result);
+      return;
+    }
+
+    current = (current === 'X') ? 'O' : 'X';
+    render();
+
+    if (mode === 'cpu' && current === 'O'){
+      await cpuTurn();
+    } else {
+      setStatus(`Tocca a ${current}.`, true);
+    }
+  }
+
+  async function cpuTurn(){
+    if (gameOver) return;
+    setStatus('La CPU sta pensando…', true);
+    render();
+
+    // small delay for UX
+    await sleep(220);
+
+    const i = pickCpuMove(board, difficulty);
+    if (i == null) return;
+
+    board[i] = 'O';
+
+    const result = getWinner(board);
+    if (result.winner){
+      endGame(result);
+      return;
+    }
+
+    current = 'X';
+    setStatus('Tocca a te.', true);
+    render();
+  }
+
+  // --- CPU AI ---
+  function emptyIndices(b){
+    const res = [];
+    for (let i=0;i<b.length;i++) if (!b[i]) res.push(i);
+    return res;
+  }
+
+  function randomMove(b){
+    const empties = emptyIndices(b);
+    if (!empties.length) return null;
+    return empties[Math.floor(Math.random() * empties.length)];
+  }
+
+  function findWinningMove(b, player){
+    for (const i of emptyIndices(b)){
+      const copy = b.slice();
+      copy[i] = player;
+      if (getWinner(copy).winner === player) return i;
+    }
+    return null;
+  }
+
+  function heuristicMove(b){
+    // 1) win
+    let m = findWinningMove(b, 'O');
+    if (m != null) return m;
+    // 2) block
+    m = findWinningMove(b, 'X');
+    if (m != null) return m;
+    // 3) center
+    if (!b[4]) return 4;
+    // 4) corners
+    const corners = [0,2,6,8].filter(i => !b[i]);
+    if (corners.length) return corners[Math.floor(Math.random()*corners.length)];
+    // 5) sides
+    const sides = [1,3,5,7].filter(i => !b[i]);
+    if (sides.length) return sides[Math.floor(Math.random()*sides.length)];
+    return null;
+  }
+
+  function pickCpuMove(b, diff){
+    if (diff === 'easy') return randomMove(b);
+
+    if (diff === 'normal'){
+      // 70% heuristic, 30% random
+      if (Math.random() < 0.7) return heuristicMove(b);
+      return randomMove(b);
+    }
+
+    if (diff === 'hard'){
+      // 92% heuristic, 8% random
+      if (Math.random() < 0.92) return heuristicMove(b);
+      return randomMove(b);
+    }
+
+    // impossible: minimax
+    return minimaxBestMove(b, 'O');
+  }
+
+  function minimaxBestMove(b, player){
+    // player: whose turn now
+    const res = minimax(b, player);
+    return res.move;
+  }
+
+  function minimax(b, player){
+    const outcome = getWinner(b);
+    if (outcome.winner === 'O') return { score:  10, move: null };
+    if (outcome.winner === 'X') return { score: -10, move: null };
+    if (outcome.winner === 'D') return { score:   0, move: null };
+
+    const moves = emptyIndices(b);
+    let best = { score: (player === 'O' ? -Infinity : Infinity), move: moves[0] };
+
+    for (const i of moves){
+      const copy = b.slice();
+      copy[i] = player;
+      const nextPlayer = (player === 'O') ? 'X' : 'O';
+      const child = minimax(copy, nextPlayer);
+
+      // prefer faster wins / slower losses: add depth bias
+      const depthBias = moves.length; // smaller when deeper
+      const score = child.score + (player === 'O' ? 0.01*depthBias : -0.01*depthBias);
+
+      if (player === 'O'){
+        if (score > best.score){
+          best = { score, move: i };
+        }
+      } else {
+        if (score < best.score){
+          best = { score, move: i };
+        }
+      }
+    }
+    return best;
+  }
+
+  // --- Events ---
+  resetBtn.addEventListener('click', startNewGame);
+  resetScoreBtn.addEventListener('click', () => {
+    score = { X: 0, O: 0, D: 0 };
+    updateScores();
+    startNewGame();
+  });
+
+  modeSel.addEventListener('change', () => {
+    mode = modeSel.value;
+    updateBadges();
+    startNewGame();
+  });
+
+  diffSel.addEventListener('change', () => {
+    difficulty = diffSel.value;
+    updateBadges();
+    startNewGame();
+  });
+
+  firstSel.addEventListener('change', () => {
+    first = firstSel.value;
+    startNewGame();
+  });
+
+  // --- Init ---
+  updateBadges();
+  updateScores();
+
+  // Build initial grid buttons once (render does it)
+  startNewGame();
+})();
+</script>
+</body>
+</html>
