@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Tris 3D vero — 4×4×4 (WebGL2, X/O mesh)</title>
+
   <style>
     :root{
       --bg:#070a10; --text:#e9eef7; --muted:#9fb0c8; --line: rgba(255,255,255,.12);
@@ -12,7 +13,8 @@
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       color: var(--text);
       background:
         radial-gradient(1100px 700px at 20% 10%, rgba(74,163,255,.18), transparent 55%),
@@ -21,158 +23,206 @@
         var(--bg);
       overflow:hidden;
     }
+
+    /* LAYOUT DESKTOP */
     .app{
-  min-height:100dvh;
-  display:grid;
-  grid-template-columns:1.25fr .75fr;
-  gap:18px;
-  padding:18px;
-}
-
-@media (max-width: 900px){
-
-  /* iOS: viewport stabile + safe-area */
-  body{
-    overflow-y:auto;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  /* layout in colonna */
-  .app{
-    grid-template-columns: 1fr !important;
-    height: auto !important;
-    padding: 14px !important;
-    gap: 14px !important;
-  }
-
-  /* canvas più grande e “usabile” */
-  #viewport{
-    height: 62svh !important;   /* svh = stabile su iOS Safari */
-    min-height: 420px !important;
-  }
-
-  /* controlli scrollabili sotto (se servono) */
-  .app > .panel:last-child{
-    max-height: none !important;
-    overflow: auto !important;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-  .app{
-    grid-template-columns:1fr;
-    padding:12px;
-    gap:12px;
-  }
-
-  #viewport{
-    height:55vh;
-    min-height:320px;
-  }
-}
-    .panel{
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  overflow:hidden; /* default: ok per il pannello sinistro (canvas) */
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-  backdrop-filter: blur(10px);
-}
-
-/* ✅ pannello destro scrollabile: così il PUNTEGGIO non viene tagliato su laptop */
-.app > .panel:last-child{
-  overflow:auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* (opzionale ma utile) header destro sticky mentre scrolli */
-.app > .panel:last-child .hdr{
-  position:sticky;
-  top:0;
-  z-index:20;
-}
-    .hdr{
-      padding:18px 18px 12px; border-bottom:1px solid var(--line); background:var(--panel);
-      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      height:100dvh;
+      display:grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap:18px;
+      padding:18px;
     }
+
+    .panel{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      backdrop-filter: blur(10px);
+      overflow:hidden;
+      min-height:0; /* IMPORTANTISSIMO per scroll/fit */
+    }
+
+    .hdr{
+      padding:18px 18px 12px;
+      border-bottom:1px solid var(--line);
+      background:var(--panel);
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+
     h1{margin:0;font-size:18px;letter-spacing:.2px}
     .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.35}
-    .badge{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.18);white-space:nowrap;}
+    .badge{
+      font-size:12px;color:var(--muted);
+      border:1px solid var(--line);
+      padding:6px 10px;border-radius:999px;
+      background:rgba(0,0,0,.18);
+      white-space:nowrap;
+    }
+
     .content{padding:18px}
     .status{
       display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
-      padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.18);margin-bottom:14px;
+      padding:12px 14px;border:1px solid var(--line);border-radius:14px;
+      background:rgba(0,0,0,.18);margin-bottom:14px;
     }
     .status .mini{color:var(--muted);font-size:12px}
-    .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.03);user-select:none;align-self:flex-start;}
+    .pill{
+      font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+      color:var(--muted);background:rgba(255,255,255,.03);
+      user-select:none;align-self:flex-start;
+    }
     .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
-    .btn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);padding:11px 12px;border-radius:14px;cursor:pointer;font-weight:950;}
+    .btn{
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      padding:11px 12px;border-radius:14px;cursor:pointer;font-weight:950;
+    }
     .btn.primary{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14)}
     .btn.danger{border-color: rgba(255,74,106,.35); background: rgba(255,74,106,.10)}
-   #viewport{
-  width:100%;
-  flex:1;
-  min-height:420px;          /* ✅ meno aggressivo su schermi piccoli */
-  position:relative;
-  overflow:hidden;
-  border-top:1px solid rgba(255,255,255,.06);
-  background: radial-gradient(700px 500px at 40% 15%, rgba(255,255,255,.05), transparent 60%);
-}
 
-@media (max-width: 900px){
-  #viewport{
-    height:58vh;             /* ✅ più spazio reale al cubo su iPhone */
-    min-height:360px;
-  }
-}
-    canvas{display:block;width:100%;height:100%}
+    /* VIEWPORT */
+    #viewport{
+      width:100%;
+      flex:1;
+      min-height:520px;
+      position:relative;
+      overflow:hidden;
+      border-top:1px solid rgba(255,255,255,.06);
+      background: radial-gradient(700px 500px at 40% 15%, rgba(255,255,255,.05), transparent 60%);
+    }
+
+    /* Canvas: FIX iOS (rotazione/pan) */
+    canvas{
+      display:block;
+      width:100%;
+      height:100%;
+      touch-action:none;          /* fondamentale su iPhone */
+      -webkit-user-select:none;
+      user-select:none;
+      -webkit-touch-callout:none;
+    }
+
     .hud{
       position:absolute; left:12px; bottom:12px; z-index:6; pointer-events:none;
       background: rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.10);
-      color: rgba(255,255,255,.88); padding:10px 12px; border-radius:14px; font-size:12px; backdrop-filter: blur(8px);
+      color: rgba(255,255,255,.88); padding:10px 12px; border-radius:14px;
+      font-size:12px; backdrop-filter: blur(8px);
     }
+
+    /* PANNELLO DESTRO: SCROLL PER FAR VEDERE SEMPRE IL PUNTEGGIO */
+    .rightPanel{
+      display:flex;
+      flex-direction:column;
+      overflow:auto;                 /* così il Punteggio non “sparisce” */
+      -webkit-overflow-scrolling: touch;
+    }
+    .rightPanel .hdr{
+      position:sticky;
+      top:0;
+      z-index:20;
+    }
+
     .section{padding:16px 18px;border-top:1px solid var(--line)}
-    .section h2{margin:0 0 10px;font-size:14px;letter-spacing:.2px;color:var(--muted);font-weight:950;text-transform:uppercase;}
+    .section h2{
+      margin:0 0 10px;font-size:14px;letter-spacing:.2px;color:var(--muted);
+      font-weight:950;text-transform:uppercase;
+    }
+
     .row{
       display:flex;align-items:center;justify-content:space-between;gap:12px;
-      padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(0,0,0,.16);margin-bottom:10px;
+      padding:10px 12px;border-radius:14px;border:1px solid var(--line);
+      background:rgba(0,0,0,.16);margin-bottom:10px;
     }
+
     label{font-size:13px;font-weight:950}
     input[type="range"]{width:200px}
+
     .toggle{display:flex;align-items:center;gap:10px;user-select:none;}
-    .switch{width:46px;height:26px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);position:relative;cursor:pointer;flex:0 0 auto;}
-    .knob{width:20px;height:20px;border-radius:999px;background:rgba(255,255,255,.75);position:absolute;top:2px;left:2px;transition:left .18s ease, background .18s ease;}
+    .switch{
+      width:46px;height:26px;border-radius:999px;border:1px solid var(--line);
+      background:rgba(255,255,255,.04);position:relative;cursor:pointer;flex:0 0 auto;
+    }
+    .knob{
+      width:20px;height:20px;border-radius:999px;background:rgba(255,255,255,.75);
+      position:absolute;top:2px;left:2px;transition:left .18s ease, background .18s ease;
+    }
     .switch.on{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14);}
     .switch.on .knob{left:24px;background: rgba(255,255,255,.92);}
+
     .zbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-    .zbtn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:950;font-size:12px;user-select:none;}
+    .zbtn{
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      padding:8px 10px;border-radius:12px;cursor:pointer;
+      font-weight:950;font-size:12px;user-select:none;
+    }
     .zbtn.active{border-color: rgba(74,163,255,.45); background: rgba(74,163,255,.16);}
-    select{background:rgba(255,255,255,.04);color:var(--text);border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:12px;font-weight:900;cursor:pointer;min-width:180px;}
+
+    select{
+      background:rgba(255,255,255,.04);color:var(--text);
+      border:1px solid rgba(255,255,255,.14);
+      padding:8px 10px;border-radius:12px;font-weight:900;cursor:pointer;min-width:180px;
+    }
+
     .score{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
     .card{border:1px solid var(--line);border-radius:16px;background:rgba(0,0,0,.16);padding:12px;}
     .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
     .v{font-size:22px;font-weight:950}
     .hint{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
-    .errorbox{position:absolute; inset:0; display:none; place-items:center; z-index:50; background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px;}
-    .errorcard{width:min(720px,100%); border:1px solid rgba(255,255,255,.14); border-radius:18px; background: rgba(10,14,22,.72); padding:16px; box-shadow: var(--shadow);}
-    .errorcard pre{white-space:pre-wrap;color: rgba(255,255,255,.85);background: rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;margin:10px 0 0;font-size:12px;line-height:1.4;}
-  
-  @media (max-width: 900px){
-  /* porta l'ultima section (Punteggio) in alto su mobile */
-  .panel .section:last-child{
-    order:-1;
-  }
 
-  /* abilita l'order dentro il pannello destro */
-  .panel{
-    display:flex;
-    flex-direction:column;
-  }
-}
+    .errorbox{
+      position:absolute; inset:0; display:none; place-items:center; z-index:50;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px;
+    }
+    .errorcard{
+      width:min(720px,100%);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:18px;
+      background: rgba(10,14,22,.72);
+      padding:16px;
+      box-shadow: var(--shadow);
+    }
+    .errorcard pre{
+      white-space:pre-wrap;
+      color: rgba(255,255,255,.85);
+      background: rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:12px;margin:10px 0 0;
+      font-size:12px;line-height:1.4;
+    }
+
+    /* MOBILE */
+    @media (max-width: 900px){
+      body{
+        overflow:auto;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .app{
+        height:auto;
+        grid-template-columns:1fr;
+        padding:14px;
+        gap:14px;
+      }
+      #viewport{
+        height:60svh;     /* svh = stabile su iOS Safari */
+        min-height:420px;
+      }
+      input[type="range"]{width:180px}
+      select{min-width:160px}
+    }
   </style>
 </head>
+
 <body>
   <div class="app">
+    <!-- LEFT -->
     <div class="panel" style="display:flex; flex-direction:column;">
       <div class="hdr">
         <div>
@@ -212,7 +262,8 @@
       </div>
     </div>
 
-    <div class="panel">
+    <!-- RIGHT -->
+    <div class="panel rightPanel">
       <div class="hdr">
         <div>
           <h1>Controlli</h1>
@@ -309,7 +360,7 @@
     if(box) box.style.display = 'grid';
   }
 
-  // ===== DOM =====
+  // DOM
   const linesBadge    = document.getElementById('linesBadge');
   const statusText    = document.getElementById('statusText');
   const turnPill      = document.getElementById('turnPill');
@@ -339,7 +390,7 @@
     return el.classList.contains('on');
   }
 
-  // ===== Mat4 minimal (column-major) =====
+  // Mat4 minimal (column-major)
   const mat4={
     I:()=>{const m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m;},
     mul:(a,b)=>{const o=new Float32Array(16);
@@ -367,7 +418,7 @@
     }
   };
 
-  // ===== GAME =====
+  // GAME
   const N=4, SIZE=N*N*N;
   const idx=(x,y,z)=>z*N*N + y*N + x;
   const toXYZ=(i)=>{
@@ -432,8 +483,10 @@
   let previewLines=[];
   let winLine=null;
 
-  // ===== WebGL2 =====
+  // WebGL2
   const canvas = document.getElementById('gl');
+  canvas.style.touchAction = 'none';
+
   const gl = canvas.getContext('webgl2', {antialias:true, alpha:true, depth:true});
   if(!gl){
     showError('Impossibile creare WebGL2. Prova Chrome/Safari aggiornato o abilita WebGL.');
@@ -463,60 +516,46 @@
     return p;
   }
 
-  // ===== SHADERS =====
   const vsLit=`#version 300 es
   precision highp float;
-
   layout(location=0) in vec3 aPos;
   layout(location=1) in vec3 aNor;
-
   layout(location=2) in vec3  iT;
   layout(location=3) in vec4  iCol;
   layout(location=4) in float iVis;
   layout(location=6) in float iS;
-
   uniform mat4 uVP;
   uniform mat4 uW;
-
   out vec3 vN;
   out vec3 vP;
   out vec4 vC;
   out float vV;
-
   void main(){
-    vV = iVis;
-
-    vec3 pLocal = aPos * iS;
-    vec4 p = uW * vec4(pLocal + iT, 1.0);
-    gl_Position = uVP * p;
-
-    vP = p.xyz;
-    vN = mat3(uW) * aNor;
-    vC = iCol;
+    vV=iVis;
+    vec3 pLocal=aPos*iS;
+    vec4 p=uW*vec4(pLocal+iT,1.0);
+    gl_Position=uVP*p;
+    vP=p.xyz;
+    vN=mat3(uW)*aNor;
+    vC=iCol;
   }`;
 
   const fsLit=`#version 300 es
   precision highp float;
-
   in vec3 vN;
   in vec3 vP;
   in vec4 vC;
   in float vV;
-
   out vec4 o;
-
   void main(){
-    if(vV < 0.5) discard;
-
-    vec3 n = normalize(vN);
-    vec3 l = normalize(vec3(0.55, 1.0, 0.75));
-    float d = max(dot(n, l), 0.0);
-
-    vec3 v = normalize(-vP);
-    float rim = pow(1.0 - max(dot(n, v), 0.0), 2.2);
-
-    vec3 col = vC.rgb * (0.34 + 0.76 * d) + vec3(0.22) * rim;
-    o = vec4(col, vC.a);
+    if(vV<0.5) discard;
+    vec3 n=normalize(vN);
+    vec3 l=normalize(vec3(0.55,1.0,0.75));
+    float d=max(dot(n,l),0.0);
+    vec3 v=normalize(-vP);
+    float rim=pow(1.0-max(dot(n,v),0.0),2.2);
+    vec3 col=vC.rgb*(0.34+0.76*d)+vec3(0.22)*rim;
+    o=vec4(col,vC.a);
   }`;
 
   const vsPick=`#version 300 es
@@ -561,7 +600,7 @@
     return;
   }
 
-  // ===== GEOMETRY =====
+  // Geometry
   function mergeMeshes(meshes){
     let totalV=0, totalI=0;
     for(const m of meshes){ totalV += m.pos.length/3; totalI += m.idx.length; }
@@ -636,9 +675,7 @@
   function makeXMesh(){
     const bar = makeBox(0.85, 0.16, 0.10);
     const a = Math.PI/4;
-    const b1 = rotateZ(bar, a);
-    const b2 = rotateZ(bar, -a);
-    return mergeMeshes([b1,b2]);
+    return mergeMeshes([rotateZ(bar,a), rotateZ(bar,-a)]);
   }
 
   function makeTorus(R=0.33, r=0.095, segU=40, segV=20){
@@ -653,15 +690,13 @@
         const y=(R + r*cv)*su;
         const z=r*sv;
         const nx=cv*cu, ny=cv*su, nz=sv;
-        pos.push(x,y,z);
-        nor.push(nx,ny,nz);
+        pos.push(x,y,z); nor.push(nx,ny,nz);
       }
     }
     const row=segV+1;
     for(let i=0;i<segU;i++){
       for(let j=0;j<segV;j++){
-        const a=i*row+j;
-        const b=a+row;
+        const a=i*row+j, b=a+row;
         idx.push(a,b,a+1, b,b+1,a+1);
       }
     }
@@ -670,21 +705,26 @@
 
   const GEO_CUBE = makeCube();
   const GEO_X    = makeXMesh();
-  const GEO_O    = makeTorus(0.33, 0.095, 40, 20);
+  const GEO_O    = makeTorus();
 
   function makeVAO(geo, indexType){
     const vao=gl.createVertexArray();
     gl.bindVertexArray(vao);
 
-    const vboP=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboP);
+    const vboP=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,vboP);
     gl.bufferData(gl.ARRAY_BUFFER, geo.pos, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
 
-    const vboN=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboN);
+    const vboN=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,vboN);
     gl.bufferData(gl.ARRAY_BUFFER, geo.nor, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
 
-    const ibo=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
+    const ibo=gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.idx, gl.STATIC_DRAW);
 
     gl.bindVertexArray(null);
@@ -695,7 +735,7 @@
   const VAO_X    = makeVAO(GEO_X,    gl.UNSIGNED_INT);
   const VAO_O    = makeVAO(GEO_O,    gl.UNSIGNED_INT);
 
-  // ===== INSTANCING BUFFERS =====
+  // Instancing
   function attachInstBuffers(vaoObj, instT, instCol, instVis){
     gl.bindVertexArray(vaoObj.vao);
 
@@ -726,37 +766,31 @@
 
   function attachInstScale(vaoObj, instScale){
     gl.bindVertexArray(vaoObj.vao);
-
     const bIS = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, bIS);
     gl.bufferData(gl.ARRAY_BUFFER, instScale.byteLength, gl.DYNAMIC_DRAW);
-
     gl.enableVertexAttribArray(6);
     gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(6, 1);
-
     gl.bindVertexArray(null);
     return bIS;
   }
 
   const INST = SIZE;
 
-  // cubes
-  const cubeT    = new Float32Array(INST * 3);
-  const cubeC    = new Float32Array(INST * 4);
+  const cubeT    = new Float32Array(INST*3);
+  const cubeC    = new Float32Array(INST*4);
   const cubeV    = new Float32Array(INST);
-  const cubePick = new Float32Array(INST * 3);
-  const cubeS    = new Float32Array(INST); // IMPORTANT: iS per cubi (fix)
+  const cubePick = new Float32Array(INST*3);
+  const cubeS    = new Float32Array(INST);
 
-  // X
-  const xT = new Float32Array(INST * 3);
-  const xC = new Float32Array(INST * 4);
+  const xT = new Float32Array(INST*3);
+  const xC = new Float32Array(INST*4);
   const xV = new Float32Array(INST);
   const xS = new Float32Array(INST);
 
-  // O
-  const oT = new Float32Array(INST * 3);
-  const oC = new Float32Array(INST * 4);
+  const oT = new Float32Array(INST*3);
+  const oC = new Float32Array(INST*4);
   const oV = new Float32Array(INST);
   const oS = new Float32Array(INST);
 
@@ -771,10 +805,9 @@
   const BUF_O    = attachInstBuffers(VAO_O,    oT,    oC,    oV);
 
   const bCS = attachInstScale(VAO_CUBE, cubeS);
-  const bXS = attachInstScale(VAO_X,    xS);
-  const bOS = attachInstScale(VAO_O,    oS);
+  const bXS = attachInstScale(VAO_X, xS);
+  const bOS = attachInstScale(VAO_O, oS);
 
-  // picking attribute (loc 5) solo su cubi
   gl.bindVertexArray(VAO_CUBE.vao);
   const bPick = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, bPick);
@@ -784,7 +817,6 @@
   gl.vertexAttribDivisor(5, 1);
   gl.bindVertexArray(null);
 
-  // linee
   const vaoL = gl.createVertexArray();
   gl.bindVertexArray(vaoL);
   const vboL = gl.createBuffer();
@@ -794,7 +826,7 @@
   gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
   gl.bindVertexArray(null);
 
-  // picking FBO
+  // Picking FBO
   let pickFbo=null, pickTex=null, pickDepth=null, pickW=0, pickH=0;
   function ensurePickFbo(w,h){
     if(pickTex && pickW===w && pickH===h) return;
@@ -823,41 +855,21 @@
 
     const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    if(st !== gl.FRAMEBUFFER_COMPLETE){
-      showError('Picking FBO non completo: ' + st);
-    }
+    if(st !== gl.FRAMEBUFFER_COMPLETE) showError('Picking FBO non completo: ' + st);
   }
 
-  // ===== CAMERA / GRID =====
-let theta = -0.7, phi = 0.95, radius = 10.8;
-let pan = [0, -0.55, 0];    // ✅ alza il cubo (target più basso = cubo più su)
+  // Camera (mobile “sensata”)
+  const IS_MOBILE = window.matchMedia('(max-width: 900px)').matches;
+  let theta=-0.7, phi=0.95, radius = IS_MOBILE ? 12.8 : 10.8;
+  let pan=[0, -0.55, 0];
 
-const IS_MOBILE = matchMedia('(max-width: 900px)').matches;
-
-/* ✅ su iPhone eri troppo vicino → qui aumentiamo la distanza iniziale */
-if (IS_MOBILE) {
-  radius = 14.2;            // più lontano = cubo intero e cliccabile
-  phi = 1.05;
-  theta = -0.62;
-}
-
-/* ✅ “recenter” automatico quando cambia dimensione (rotazione / barra Safari) */
-let __lastFitW = 0, __lastFitH = 0;
-function fitCameraToView(W, H){
-  if(!IS_MOBILE) return;
-  if(Math.abs(W-__lastFitW) < 40 && Math.abs(H-__lastFitH) < 40) return;
-  __lastFitW = W; __lastFitH = H;
-
-  // heuristic: più schermo “basso” = serve più distanza
-  const aspect = W / Math.max(1, H);
-  const base = 14.2;
-  radius = base + (aspect > 0.65 ? 0.0 : 2.2);  // portrait “stretto” → allontana
-  radius = clamp(radius, 12.5, 18.5);
-}
-/* ✅ mobile: camera più vicina (cubo più grande e giocabile) */
-if (window.matchMedia('(max-width: 900px)').matches) {
-  radius = 8.2;
-}
+  function fitCameraToView(W,H){
+    if(!IS_MOBILE) return;
+    const aspect = W / Math.max(1,H);
+    const base = 12.8;
+    radius = base + (aspect < 0.62 ? 2.0 : 0.0);
+    radius = clamp(radius, 11.5, 18.0);
+  }
 
   function getEye(){
     const x=radius*Math.cos(theta)*Math.sin(phi);
@@ -894,23 +906,16 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     for(let i=0;i<SIZE;i++){
       const p = pointOfIndex(i);
 
-      cubeT[i*3+0]=p[0];
-      cubeT[i*3+1]=p[1];
-      cubeT[i*3+2]=p[2];
+      cubeT[i*3+0]=p[0]; cubeT[i*3+1]=p[1]; cubeT[i*3+2]=p[2];
 
       const z=toXYZ(i).z;
       const layerOpacity=[1.0,0.78,0.60,0.45][z];
-      cubeC[i*4+0]=0.10;
-      cubeC[i*4+1]=0.13;
-      cubeC[i*4+2]=0.18;
-      cubeC[i*4+3]=0.92*layerOpacity;
+      cubeC[i*4+0]=0.10; cubeC[i*4+1]=0.13; cubeC[i*4+2]=0.18; cubeC[i*4+3]=0.92*layerOpacity;
 
       cubeV[i]=(planeZ===null || z===planeZ)?1.0:0.0;
 
       const rgb=encodeIdToRGB(i+1);
-      cubePick[i*3+0]=rgb[0];
-      cubePick[i*3+1]=rgb[1];
-      cubePick[i*3+2]=rgb[2];
+      cubePick[i*3+0]=rgb[0]; cubePick[i*3+1]=rgb[1]; cubePick[i*3+2]=rgb[2];
 
       const planeOk = (planeZ===null || z===planeZ);
       const sx=p[0], sy=p[1], sz=p[2]+SYMBOL_LIFT;
@@ -931,21 +936,22 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeT);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeC);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bPick);         gl.bufferSubData(gl.ARRAY_BUFFER,0,cubePick);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bCS);           gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeS);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bPick);        gl.bufferSubData(gl.ARRAY_BUFFER,0,cubePick);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bCS);          gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeS);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,xT);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,xC);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,xV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bXS);        gl.bufferSubData(gl.ARRAY_BUFFER,0,xS);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bXS);       gl.bufferSubData(gl.ARRAY_BUFFER,0,xS);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,oT);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,oC);
     gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,oV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bOS);        gl.bufferSubData(gl.ARRAY_BUFFER,0,oS);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bOS);       gl.bufferSubData(gl.ARRAY_BUFFER,0,oS);
   }
 
   function clearPreview(){ previewLines=[]; }
+
   function linePotential(line, player){
     const opp=(player==='X')?'O':'X';
     let p=0,o=0,e=0;
@@ -1009,8 +1015,10 @@ if (window.matchMedia('(max-width: 900px)').matches) {
   function drawPick(VP,Wm){
     gl.bindFramebuffer(gl.FRAMEBUFFER,pickFbo);
     gl.viewport(0,0,pickW,pickH);
-    gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
-    gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.disable(gl.BLEND);
+    gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
     gl.useProgram(PPICK);
     gl.bindVertexArray(VAO_CUBE.vao);
@@ -1031,7 +1039,7 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
     gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    const id = buf[0] + (buf[1] << 8) + (buf[2] << 16);
+    const id = buf[0] + (buf[1]<<8) + (buf[2]<<16);
     if(!id) return null;
     const i = id - 1;
     if(planeZ !== null && toXYZ(i).z !== planeZ) return null;
@@ -1084,12 +1092,13 @@ if (window.matchMedia('(max-width: 900px)').matches) {
         gl.uniform4f(gl.getUniformLocation(PLINE,'uCol'), 1,1,1, 0.92);
         gl.drawArrays(gl.LINES, previewLines.length*2, 2);
       }
+
       gl.bindVertexArray(null);
       gl.useProgram(null);
     }
   }
 
-  // ===== GAME / CPU =====
+  // GAME / CPU
   function empties(){
     const e=[];
     for(let i=0;i<SIZE;i++){
@@ -1211,9 +1220,15 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     if(vsCPU && current==='O') cpuMove();
   }
 
-  // ===== INPUT =====
+  // INPUT (FIX iPhone: blocca scroll pagina durante drag)
   let dragging=false, dragMode='rotate', lastX=0,lastY=0;
   let mouseX=0, mouseY=0, mouseMoved=true;
+
+  function stopPageScroll(e){
+    if(dragging) e.preventDefault();
+  }
+  canvas.addEventListener('touchmove', stopPageScroll, {passive:false});
+  canvas.addEventListener('touchstart', (e)=>e.preventDefault(), {passive:false});
 
   canvas.addEventListener('pointerdown',(e)=>{
     dragging=true;
@@ -1221,10 +1236,14 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     dragMode = e.shiftKey ? 'pan' : 'rotate';
     canvas.setPointerCapture(e.pointerId);
   });
-  canvas.addEventListener('pointerup',(e)=>{
+
+  function endPointer(e){
     dragging=false;
     try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-  });
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+
   canvas.addEventListener('pointermove',(e)=>{
     const rect=canvas.getBoundingClientRect();
     const dpr=Math.min(2, window.devicePixelRatio||1);
@@ -1232,6 +1251,7 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     if(dragging){
       const dx=e.clientX-lastX, dy=e.clientY-lastY;
       lastX=e.clientX; lastY=e.clientY;
+
       if(dragMode==='rotate'){
         theta -= dx*0.007;
         phi   -= dy*0.007;
@@ -1253,7 +1273,7 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     e.preventDefault();
     const delta=Math.sign(e.deltaY);
     radius *= (delta>0)?1.08:0.92;
-    radius = clamp(radius, 5.2, 26);
+    radius = clamp(radius, 6.2, 26);
   },{passive:false});
 
   canvas.addEventListener('click',(e)=>{
@@ -1265,7 +1285,7 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     if(i!=null) play(i);
   });
 
-  // ===== UI =====
+  // UI
   function buildZBar(){
     const items=[{t:'Tutti',v:null},{t:'Z0',v:0},{t:'Z1',v:1},{t:'Z2',v:2},{t:'Z3',v:3}];
     zbar.innerHTML='';
@@ -1332,7 +1352,6 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     updateTurn();
   }
 
-  // ===== LOOP =====
   function tick(){
     const {W,H}=setCanvasSize();
     fitCameraToView(W,H);
@@ -1352,7 +1371,7 @@ if (window.matchMedia('(max-width: 900px)').matches) {
     requestAnimationFrame(tick);
   }
 
-  // ===== INIT =====
+  // INIT
   buildZBar();
   updateScores();
   toggleSwitch(explodeSwitch,false); explodeBadge.textContent='OFF';
