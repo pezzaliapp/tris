@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tris 3D vero — 4×4×4 (WebGL2 self-contained)</title>
+  <title>Tris 3D vero — 4×4×4 (WebGL2, X/O mesh)</title>
   <style>
     :root{
       --bg:#070a10; --text:#e9eef7; --muted:#9fb0c8; --line: rgba(255,255,255,.12);
@@ -79,9 +79,6 @@
     .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
     .v{font-size:22px;font-weight:950}
     .hint{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
-    .overlay2d{position:absolute; inset:0; pointer-events:none; z-index:5;}
-    .mark{position:absolute; transform:translate(-50%,-50%); font-weight:950; font-size:30px; text-shadow: 0 10px 20px rgba(0,0,0,.6); opacity:.98; user-select:none;}
-    .mark.x{color:#4aa3ff} .mark.o{color:#44d19e}
     .errorbox{position:absolute; inset:0; display:none; place-items:center; z-index:50; background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px;}
     .errorcard{width:min(720px,100%); border:1px solid rgba(255,255,255,.14); border-radius:18px; background: rgba(10,14,22,.72); padding:16px; box-shadow: var(--shadow);}
     .errorcard pre{white-space:pre-wrap;color: rgba(255,255,255,.85);background: rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;margin:10px 0 0;font-size:12px;line-height:1.4;}
@@ -89,12 +86,12 @@
 </head>
 <body>
   <div class="app">
-        <!-- LEFT -->
+    <!-- LEFT -->
     <div class="panel" style="display:flex; flex-direction:column;">
       <div class="hdr">
         <div>
           <h1>Tris 3D vero — 4×4×4 (WebGL2)</h1>
-          <div class="sub">Self-contained: nessuna libreria esterna. Ruota/zoom e clicca i cubetti. 4 in linea in qualunque direzione.</div>
+          <div class="sub">X e O sono mesh 3D (WebGL). Ruota/zoom e clicca i cubetti. 4 in linea in qualunque direzione.</div>
         </div>
         <div class="badge" id="linesBadge">Linee: …</div>
       </div>
@@ -117,7 +114,6 @@
 
       <div id="viewport">
         <canvas id="gl"></canvas>
-        <div class="overlay2d" id="overlay2d"></div>
         <div class="hud">Drag = ruota • Scroll = zoom • Shift+Drag = pan • Hover = preview (se ON)</div>
 
         <div class="errorbox" id="errorbox">
@@ -243,7 +239,6 @@
   const zbar = document.getElementById('zbar');
   const scoreXEl = document.getElementById('scoreX');
   const scoreOEl = document.getElementById('scoreO');
-  const overlay2d = document.getElementById('overlay2d');
 
   function setStatus(msg){ statusText.innerHTML = `<strong>${msg}</strong>`; }
   function updateTurn(){ turnPill.textContent = `Turno: ${current}`; }
@@ -316,9 +311,7 @@
 
   let score={X:0,O:0};
 
-  // Preview state
   let hoveredIndex=null;
-  let previewAnchor=null;
   let previewLines=[];
   let winLine=null;
 
@@ -473,17 +466,25 @@
       return m;
     }
   };
-
-  const vs=`#version 300 es
+    // ===== SHADERS =====
+  const vsLit=`#version 300 es
   precision highp float;
   layout(location=0) in vec3 aPos;
   layout(location=1) in vec3 aNor;
+
+  // instancing
   layout(location=2) in vec3 iT;
   layout(location=3) in vec4 iCol;
   layout(location=4) in float iVis;
+
   uniform mat4 uVP;
   uniform mat4 uW;
-  out vec3 vN; out vec3 vP; out vec4 vC; out float vV;
+
+  out vec3 vN;
+  out vec3 vP;
+  out vec4 vC;
+  out float vV;
+
   void main(){
     vV=iVis;
     vec4 p=uW*vec4(aPos+iT,1.0);
@@ -492,20 +493,23 @@
     vN=mat3(uW)*aNor;
     vC=iCol;
   }`;
-  const fs=`#version 300 es
+
+  const fsLit=`#version 300 es
   precision highp float;
   in vec3 vN; in vec3 vP; in vec4 vC; in float vV;
   out vec4 o;
   void main(){
     if(vV<0.5) discard;
     vec3 n=normalize(vN);
-    vec3 l=normalize(vec3(0.6,1.0,0.8));
+    vec3 l=normalize(vec3(0.55,1.0,0.75));
     float d=max(dot(n,l),0.0);
     vec3 v=normalize(-vP);
-    float rim=pow(1.0-max(dot(n,v),0.0),2.5);
-    vec3 col=vC.rgb*(0.35+0.75*d)+vec3(0.25)*rim;
+    float rim=pow(1.0-max(dot(n,v),0.0),2.2);
+    vec3 col=vC.rgb*(0.34+0.76*d)+vec3(0.22)*rim;
     o=vec4(col,vC.a);
   }`;
+
+  // picking (solo cubi)
   const vsPick=`#version 300 es
   precision highp float;
   layout(location=0) in vec3 aPos;
@@ -519,33 +523,53 @@
     vV=iVis; vPick=iPick;
     gl_Position=uVP*(uW*vec4(aPos+iT,1.0));
   }`;
+
   const fsPick=`#version 300 es
   precision highp float;
   in vec3 vPick; in float vV;
   out vec4 o;
   void main(){ if(vV<0.5) discard; o=vec4(vPick,1.0); }`;
+
+  // lines
   const vsLine=`#version 300 es
   precision highp float;
   layout(location=0) in vec3 aPos;
   uniform mat4 uVP;
   void main(){ gl_Position=uVP*vec4(aPos,1.0); }`;
+
   const fsLine=`#version 300 es
   precision highp float;
   uniform vec4 uCol;
   out vec4 o;
   void main(){ o=uCol; }`;
 
-  let P,PP,PL;
+  let PLIT, PPICK, PLINE;
   try{
-    P=link(compile(gl.VERTEX_SHADER,vs),compile(gl.FRAGMENT_SHADER,fs));
-    PP=link(compile(gl.VERTEX_SHADER,vsPick),compile(gl.FRAGMENT_SHADER,fsPick));
-    PL=link(compile(gl.VERTEX_SHADER,vsLine),compile(gl.FRAGMENT_SHADER,fsLine));
+    PLIT = link(compile(gl.VERTEX_SHADER,vsLit), compile(gl.FRAGMENT_SHADER,fsLit));
+    PPICK = link(compile(gl.VERTEX_SHADER,vsPick), compile(gl.FRAGMENT_SHADER,fsPick));
+    PLINE = link(compile(gl.VERTEX_SHADER,vsLine), compile(gl.FRAGMENT_SHADER,fsLine));
   }catch(e){
     showError('Shader error:\n'+(e.message||String(e)));
     return;
   }
+    // ===== GEOMETRY HELPERS =====
+  function mergeMeshes(meshes){
+    let totalV=0, totalI=0;
+    for(const m of meshes){ totalV += m.pos.length/3; totalI += m.idx.length; }
+    const pos=new Float32Array(totalV*3);
+    const nor=new Float32Array(totalV*3);
+    const idx=new Uint32Array(totalI);
+    let vOff=0, iOff=0;
+    for(const m of meshes){
+      pos.set(m.pos, vOff*3);
+      nor.set(m.nor, vOff*3);
+      for(let k=0;k<m.idx.length;k++) idx[iOff+k] = m.idx[k] + vOff;
+      vOff += m.pos.length/3;
+      iOff += m.idx.length;
+    }
+    return {pos,nor,idx};
+  }
 
-  // cube geometry
   function makeCube(){
     const p=[], n=[], idxs=[];
     const faces=[
@@ -565,43 +589,163 @@
     }
     return {pos:new Float32Array(p), nor:new Float32Array(n), idx:new Uint16Array(idxs)};
   }
-  const cube=makeCube();
 
-  const vao=gl.createVertexArray();
-  gl.bindVertexArray(vao);
-
-  const vboPos=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboPos);
-  gl.bufferData(gl.ARRAY_BUFFER,cube.pos,gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-
-  const vboNor=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboNor);
-  gl.bufferData(gl.ARRAY_BUFFER,cube.nor,gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
-
-  const ibo=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cube.idx,gl.STATIC_DRAW);
-
-  // instance buffers
-  const INST=SIZE;
-  const instT=new Float32Array(INST*3);
-  const instCol=new Float32Array(INST*4);
-  const instVis=new Float32Array(INST);
-  const instPick=new Float32Array(INST*3);
-
-  function bindInst(loc, arr, size){
-    const b=gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER,b);
-    gl.bufferData(gl.ARRAY_BUFFER,arr.byteLength,gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc,size,gl.FLOAT,false,0,0);
-    gl.vertexAttribDivisor(loc,1);
-    return b;
+  function makeBox(w,h,d){
+    // centered box
+    const x=w/2,y=h/2,z=d/2;
+    const faces=[
+      // +X
+      {nor:[ 1,0,0], v:[[ x,-y,-z],[ x, y,-z],[ x, y, z],[ x,-y, z]]},
+      // -X
+      {nor:[-1,0,0], v:[[-x,-y, z],[-x, y, z],[-x, y,-z],[-x,-y,-z]]},
+      // +Y
+      {nor:[0, 1,0], v:[[-x, y,-z],[-x, y, z],[ x, y, z],[ x, y,-z]]},
+      // -Y
+      {nor:[0,-1,0], v:[[-x,-y, z],[-x,-y,-z],[ x,-y,-z],[ x,-y, z]]},
+      // +Z
+      {nor:[0,0, 1], v:[[-x,-y, z],[ x,-y, z],[ x, y, z],[-x, y, z]]},
+      // -Z
+      {nor:[0,0,-1], v:[[ x,-y,-z],[-x,-y,-z],[-x, y,-z],[ x, y,-z]]},
+    ];
+    const p=[], n=[], idx=[];
+    let vi=0;
+    for(const f of faces){
+      p.push(...f.v[0],...f.v[1],...f.v[2],...f.v[3]);
+      for(let k=0;k<4;k++) n.push(...f.nor);
+      idx.push(vi,vi+1,vi+2, vi,vi+2,vi+3);
+      vi+=4;
+    }
+    return {pos:new Float32Array(p), nor:new Float32Array(n), idx:new Uint16Array(idx)};
   }
-  const bIT=bindInst(2,instT,3);
-  const bIC=bindInst(3,instCol,4);
-  const bIV=bindInst(4,instVis,1);
-  const bIP=bindInst(5,instPick,3);
 
+  function rotateZ(mesh, a){
+    const c=Math.cos(a), s=Math.sin(a);
+    const pos=new Float32Array(mesh.pos.length);
+    const nor=new Float32Array(mesh.nor.length);
+    for(let i=0;i<mesh.pos.length;i+=3){
+      const x=mesh.pos[i], y=mesh.pos[i+1], z=mesh.pos[i+2];
+      pos[i]=c*x - s*y; pos[i+1]=s*x + c*y; pos[i+2]=z;
+      const nx=mesh.nor[i], ny=mesh.nor[i+1], nz=mesh.nor[i+2];
+      nor[i]=c*nx - s*ny; nor[i+1]=s*nx + c*ny; nor[i+2]=nz;
+    }
+    return {pos,nor,idx:mesh.idx};
+  }
+
+  function makeXMesh(){
+    // due barre incrociate (tipo KubeApp)
+    const bar = makeBox(0.85, 0.16, 0.10);
+    const a = Math.PI/4;
+    const b1 = rotateZ(bar, a);
+    const b2 = rotateZ(bar, -a);
+    return mergeMeshes([b1,b2]);
+  }
+
+  function makeTorus(R=0.34, r=0.10, segU=36, segV=18){
+    const pos=[], nor=[], idx=[];
+    for(let i=0;i<=segU;i++){
+      const u=i/segU * Math.PI*2;
+      const cu=Math.cos(u), su=Math.sin(u);
+      for(let j=0;j<=segV;j++){
+        const v=j/segV * Math.PI*2;
+        const cv=Math.cos(v), sv=Math.sin(v);
+
+        const x=(R + r*cv)*cu;
+        const y=(R + r*cv)*su;
+        const z=r*sv;
+
+        // normal
+        const nx=cv*cu;
+        const ny=cv*su;
+        const nz=sv;
+
+        pos.push(x,y,z);
+        nor.push(nx,ny,nz);
+      }
+    }
+    const row=segV+1;
+    for(let i=0;i<segU;i++){
+      for(let j=0;j<segV;j++){
+        const a=i*row+j;
+        const b=a+row;
+        idx.push(a,b,a+1, b,b+1,a+1);
+      }
+    }
+    return {pos:new Float32Array(pos), nor:new Float32Array(nor), idx:new Uint32Array(idx)};
+  }
+
+  const GEO_CUBE = makeCube();
+  const GEO_X    = makeXMesh();
+  const GEO_O    = makeTorus(0.33, 0.095, 40, 20);
+    function makeVAO(geo, useUint32){
+    const vao=gl.createVertexArray();
+    gl.bindVertexArray(vao);
+
+    const vboP=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboP);
+    gl.bufferData(gl.ARRAY_BUFFER, geo.pos, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+
+    const vboN=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vboN);
+    gl.bufferData(gl.ARRAY_BUFFER, geo.nor, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
+
+    const ibo=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.idx, gl.STATIC_DRAW);
+
+    gl.bindVertexArray(null);
+    return {vao, count: geo.idx.length, indexType: useUint32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT};
+  }
+
+  const VAO_CUBE = makeVAO(GEO_CUBE, false);
+  const VAO_X    = makeVAO(GEO_X, true);
+  const VAO_O    = makeVAO(GEO_O, true);
+
+  // instance buffers (shared format: iT vec3, iCol vec4, iVis float)
+  function attachInstBuffers(vao, instT, instCol, instVis){
+    gl.bindVertexArray(vao.vao);
+
+    const bIT=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bIT);
+    gl.bufferData(gl.ARRAY_BUFFER, instT.byteLength, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,0,0); gl.vertexAttribDivisor(2,1);
+
+    const bIC=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bIC);
+    gl.bufferData(gl.ARRAY_BUFFER, instCol.byteLength, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3,4,gl.FLOAT,false,0,0); gl.vertexAttribDivisor(3,1);
+
+    const bIV=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bIV);
+    gl.bufferData(gl.ARRAY_BUFFER, instVis.byteLength, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4,1,gl.FLOAT,false,0,0); gl.vertexAttribDivisor(4,1);
+
+    gl.bindVertexArray(null);
+    return {bIT,bIC,bIV};
+  }
+
+  const INST=SIZE;
+
+  // cubes
+  const cubeT=new Float32Array(INST*3);
+  const cubeC=new Float32Array(INST*4);
+  const cubeV=new Float32Array(INST);
+  const cubePick=new Float32Array(INST*3);
+
+  // X mesh per cell
+  const xT=new Float32Array(INST*3);
+  const xC=new Float32Array(INST*4);
+  const xV=new Float32Array(INST);
+
+  // O mesh per cell
+  const oT=new Float32Array(INST*3);
+  const oC=new Float32Array(INST*4);
+  const oV=new Float32Array(INST);
+
+  const BUF_CUBE = attachInstBuffers(VAO_CUBE, cubeT, cubeC, cubeV);
+  const BUF_X    = attachInstBuffers(VAO_X,    xT,    xC,    xV);
+  const BUF_O    = attachInstBuffers(VAO_O,    oT,    oC,    oV);
+
+  // extra inst attrib for picking (solo cube)
+  gl.bindVertexArray(VAO_CUBE.vao);
+  const bPick=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bPick);
+  gl.bufferData(gl.ARRAY_BUFFER, cubePick.byteLength, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5,3,gl.FLOAT,false,0,0); gl.vertexAttribDivisor(5,1);
   gl.bindVertexArray(null);
 
   // line VAO
@@ -636,10 +780,9 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     if(st!==gl.FRAMEBUFFER_COMPLETE) showError('Picking FBO non completo: '+st);
   }
-
-  // Camera orbit
+    // ===== CAMERA / GRID =====
   let theta=-0.7, phi=0.85, radius=10.5;
-  let target=[0,0,0], pan=[0,0,0];
+  let pan=[0,0,0];
 
   function getEye(){
     const x=radius*Math.cos(theta)*Math.sin(phi);
@@ -648,13 +791,14 @@
     return [x+pan[0], y+pan[1], z+pan[2]];
   }
   function getWorld(){
+    // leggero tilt “KubeApp-like”
     const rx=mat4.rotX(0.08), ry=mat4.rotY(-0.12);
     return mat4.mul(ry,rx);
   }
 
-  // Board positions
   const cellSize=1.0, gap=0.22, spacingXY=cellSize+gap;
   const half=(N-1)*spacingXY/2;
+
   function pointOfIndex(i){
     const {x,y,z}=toXYZ(i);
     const px=x*spacingXY-half;
@@ -663,62 +807,60 @@
     const pz=((N-1)/2 - z)*baseZ;
     return [px,py,pz];
   }
+
   function encodeIdToRGB(id){
     const r=(id&255), g=((id>>8)&255), b=((id>>16)&255);
     return [r/255,g/255,b/255];
   }
-    // Marks overlay
-  const markEls=new Array(SIZE).fill(null);
-  let dirtyMarks=true;
-  function ensureMarkEl(i){
-    if(markEls[i]) return;
-    const el=document.createElement('div');
-    el.className='mark';
-    overlay2d.appendChild(el);
-    markEls[i]=el;
-  }
-  function syncMark(i){
-    const el=markEls[i]; if(!el) return;
-    const v=board[i];
-    if(!v){ el.style.display='none'; return; }
-    el.style.display='';
-    el.textContent=v;
-    el.classList.toggle('x', v==='X');
-    el.classList.toggle('o', v==='O');
-  }
-  function project(p, VP, W, H){
-    const x=p[0],y=p[1],z=p[2], m=VP;
-    const cx=m[0]*x+m[4]*y+m[8]*z+m[12];
-    const cy=m[1]*x+m[5]*y+m[9]*z+m[13];
-    const cz=m[2]*x+m[6]*y+m[10]*z+m[14];
-    const cw=m[3]*x+m[7]*y+m[11]*z+m[15];
-    if(!cw) return null;
-    const ndx=cx/cw, ndy=cy/cw;
-    return {x:(ndx*0.5+0.5)*W, y:(1-(ndy*0.5+0.5))*H, d:cz/cw};
-  }
 
-  function rebuildInstances(){
+  function syncInstances(){
     for(let i=0;i<SIZE;i++){
       const p=pointOfIndex(i);
-      instT[i*3+0]=p[0]; instT[i*3+1]=p[1]; instT[i*3+2]=p[2];
+
+      // cube
+      cubeT[i*3+0]=p[0]; cubeT[i*3+1]=p[1]; cubeT[i*3+2]=p[2];
+
       const z=toXYZ(i).z;
       const layerOpacity=[1.0,0.78,0.60,0.45][z];
-      instCol[i*4+0]=0.10; instCol[i*4+1]=0.13; instCol[i*4+2]=0.18; instCol[i*4+3]=0.95*layerOpacity;
-      instVis[i]=(planeZ===null || z===planeZ)?1.0:0.0;
-      const rgb=encodeIdToRGB(i+1);
-      instPick[i*3+0]=rgb[0]; instPick[i*3+1]=rgb[1]; instPick[i*3+2]=rgb[2];
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER,bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,instT);
-    gl.bindBuffer(gl.ARRAY_BUFFER,bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,instCol);
-    gl.bindBuffer(gl.ARRAY_BUFFER,bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,instVis);
-    gl.bindBuffer(gl.ARRAY_BUFFER,bIP); gl.bufferSubData(gl.ARRAY_BUFFER,0,instPick);
-  }
+      cubeC[i*4+0]=0.10; cubeC[i*4+1]=0.13; cubeC[i*4+2]=0.18; cubeC[i*4+3]=0.92*layerOpacity;
 
-  function clearPreview(){ previewAnchor=null; previewLines=[]; }
+      cubeV[i]=(planeZ===null || z===planeZ)?1.0:0.0;
+
+      const rgb=encodeIdToRGB(i+1);
+      cubePick[i*3+0]=rgb[0]; cubePick[i*3+1]=rgb[1]; cubePick[i*3+2]=rgb[2];
+
+      // X / O instance base (pos al centro cubo, leggermente “in avanti” per leggibilità)
+      const lift = 0.02; // tiny offset
+      xT[i*3+0]=p[0]; xT[i*3+1]=p[1]; xT[i*3+2]=p[2]+lift;
+      oT[i*3+0]=p[0]; oT[i*3+1]=p[1]; oT[i*3+2]=p[2]+lift;
+
+      // colori (stabili)
+      xC[i*4+0]=0.29; xC[i*4+1]=0.64; xC[i*4+2]=1.00; xC[i*4+3]=0.98;
+      oC[i*4+0]=0.27; oC[i*4+1]=0.82; oC[i*4+2]=0.62; oC[i*4+3]=0.98;
+
+      // visibilità: solo se board[i]==X/O e il piano è visibile
+      const planeOk = (planeZ===null || z===planeZ);
+      xV[i] = (planeOk && board[i]==='X') ? 1.0 : 0.0;
+      oV[i] = (planeOk && board[i]==='O') ? 1.0 : 0.0;
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeT);
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeC);
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeV);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bPick);         gl.bufferSubData(gl.ARRAY_BUFFER,0,cubePick);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,xT);
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,xC);
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,xV);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,oT);
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,oC);
+    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,oV);
+  }
+    function clearPreview(){ previewLines=[]; }
   function setPreviewForCell(i){
     clearPreview();
     if(!teach || gameOver || board[i]) return;
-    previewAnchor=i;
     let lines=LINES_THROUGH[i];
     if(planeZ!==null) lines=lines.filter(l=>l.every(c=>toXYZ(c).z===planeZ));
     previewLines = lines
@@ -749,7 +891,6 @@
       canvas.width=W; canvas.height=H;
       gl.viewport(0,0,W,H);
       ensurePickFbo(W,H);
-      dirtyMarks=true;
     }
     return {W,H,dpr};
   }
@@ -761,17 +902,17 @@
     return mat4.mul(proj, view);
   }
 
-  function drawPick(VP,W){
+  function drawPick(VP,Wm){
     gl.bindFramebuffer(gl.FRAMEBUFFER,pickFbo);
     gl.viewport(0,0,pickW,pickH);
     gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
     gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-    gl.useProgram(PP);
-    gl.bindVertexArray(vao);
-    gl.uniformMatrix4fv(gl.getUniformLocation(PP,'uVP'),false,VP);
-    gl.uniformMatrix4fv(gl.getUniformLocation(PP,'uW'),false,W);
-    gl.drawElementsInstanced(gl.TRIANGLES, cube.idx.length, gl.UNSIGNED_SHORT, 0, INST);
+    gl.useProgram(PPICK);
+    gl.bindVertexArray(VAO_CUBE.vao);
+    gl.uniformMatrix4fv(gl.getUniformLocation(PPICK,'uVP'),false,VP);
+    gl.uniformMatrix4fv(gl.getUniformLocation(PPICK,'uW'),false,Wm);
+    gl.drawElementsInstanced(gl.TRIANGLES, VAO_CUBE.count, VAO_CUBE.indexType, 0, INST);
 
     gl.bindVertexArray(null);
     gl.useProgram(null);
@@ -791,7 +932,15 @@
     return i;
   }
 
-  function drawMain(VP,W){
+  function drawLit(vaoObj, VP, Wm){
+    gl.bindVertexArray(vaoObj.vao);
+    gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uVP'),false,VP);
+    gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uW'),false,Wm);
+    gl.drawElementsInstanced(gl.TRIANGLES, vaoObj.count, vaoObj.indexType, 0, INST);
+    gl.bindVertexArray(null);
+  }
+
+  function drawMain(VP,Wm){
     gl.viewport(0,0,canvas.width,canvas.height);
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
@@ -799,28 +948,28 @@
     gl.clearColor(0,0,0,0);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-    gl.useProgram(P);
-    gl.bindVertexArray(vao);
-    gl.uniformMatrix4fv(gl.getUniformLocation(P,'uVP'),false,VP);
-    gl.uniformMatrix4fv(gl.getUniformLocation(P,'uW'),false,W);
-    gl.drawElementsInstanced(gl.TRIANGLES, cube.idx.length, gl.UNSIGNED_SHORT, 0, INST);
-    gl.bindVertexArray(null);
+    // cubi + simboli
+    gl.useProgram(PLIT);
+    drawLit(VAO_CUBE, VP, Wm);
+    drawLit(VAO_X, VP, Wm);
+    drawLit(VAO_O, VP, Wm);
     gl.useProgram(null);
 
+    // linee didattiche + linea vittoria
     const lv=buildLineVerts();
     if(lv.length){
-      gl.useProgram(PL);
+      gl.useProgram(PLINE);
       gl.bindVertexArray(vaoL);
       gl.bindBuffer(gl.ARRAY_BUFFER,vboL);
       gl.bufferData(gl.ARRAY_BUFFER, lv, gl.DYNAMIC_DRAW);
-      gl.uniformMatrix4fv(gl.getUniformLocation(PL,'uVP'),false,VP);
+      gl.uniformMatrix4fv(gl.getUniformLocation(PLINE,'uVP'),false,VP);
 
       if(previewLines.length){
-        gl.uniform4f(gl.getUniformLocation(PL,'uCol'), 1,1,1, 0.22);
+        gl.uniform4f(gl.getUniformLocation(PLINE,'uCol'), 1,1,1, 0.22);
         gl.drawArrays(gl.LINES, 0, previewLines.length*2);
       }
       if(winLine){
-        gl.uniform4f(gl.getUniformLocation(PL,'uCol'), 1,1,1, 0.92);
+        gl.uniform4f(gl.getUniformLocation(PLINE,'uCol'), 1,1,1, 0.92);
         gl.drawArrays(gl.LINES, previewLines.length*2, 2);
       }
       gl.bindVertexArray(null);
@@ -838,9 +987,7 @@
 
   function place(i,who){
     board[i]=who;
-    ensureMarkEl(i);
-    syncMark(i);
-    dirtyMarks=true;
+    syncInstances(); // aggiorna X/O visibilità
     clearPreview();
   }
 
@@ -873,29 +1020,7 @@
     if(vsCPU && current==='O') cpuMove();
   }
 
-  // ===== UI build Z =====
-  function buildZBar(){
-    const items=[{t:'Tutti',v:null},{t:'Z0',v:0},{t:'Z1',v:1},{t:'Z2',v:2},{t:'Z3',v:3}];
-    zbar.innerHTML='';
-    for(const it of items){
-      const b=document.createElement('button');
-      b.className='zbtn';
-      b.textContent=it.t;
-      b.onclick=()=>{ planeZ=it.v; syncZBar(); rebuildInstances(); dirtyMarks=true; clearPreview(); };
-      zbar.appendChild(b);
-    }
-    syncZBar();
-  }
-  function syncZBar(){
-    [...zbar.querySelectorAll('.zbtn')].forEach(b=>b.classList.remove('active'));
-    [...zbar.querySelectorAll('.zbtn')].forEach(b=>{
-      const t=b.textContent;
-      const v=(t==='Tutti')?null:Number(t.slice(1));
-      if((v===null && planeZ===null) || v===planeZ) b.classList.add('active');
-    });
-  }
-
-  // ===== INPUT =====
+  // ===== INPUT (orbit/pan/zoom + pick) =====
   let dragging=false, dragMode='rotate', lastX=0,lastY=0;
   let mouseX=0, mouseY=0, mouseMoved=true;
 
@@ -916,7 +1041,6 @@
     if(dragging){
       const dx=e.clientX-lastX, dy=e.clientY-lastY;
       lastX=e.clientX; lastY=e.clientY;
-
       if(dragMode==='rotate'){
         theta -= dx*0.007;
         phi   -= dy*0.007;
@@ -926,12 +1050,11 @@
         pan[0] += -dx*panSpeed;
         pan[1] +=  dy*panSpeed;
       }
-      dirtyMarks=true;
       return;
     }
 
     mouseX=(e.clientX-rect.left)*dpr;
-    mouseY=(rect.height-(e.clientY-rect.top))*dpr; // flip Y
+    mouseY=(rect.height-(e.clientY-rect.top))*dpr;
     mouseMoved=true;
   });
 
@@ -940,12 +1063,43 @@
     const delta=Math.sign(e.deltaY);
     radius *= (delta>0)?1.08:0.92;
     radius = clamp(radius, 5.2, 26);
-    dirtyMarks=true;
   },{passive:false});
 
-  canvas.addEventListener('click',()=>{
-    if(hoveredIndex!=null) play(hoveredIndex);
+  // click = pick al momento del click (no hoveredIndex “stale”)
+  canvas.addEventListener('click',(e)=>{
+    const rect=canvas.getBoundingClientRect();
+    const dpr=Math.min(2, window.devicePixelRatio||1);
+    const px=(e.clientX-rect.left)*dpr;
+    const py=(rect.height-(e.clientY-rect.top))*dpr;
+    const i=pickAt(px,py);
+    if(i!=null) play(i);
   });
+    // ===== UI build Z =====
+  function buildZBar(){
+    const items=[{t:'Tutti',v:null},{t:'Z0',v:0},{t:'Z1',v:1},{t:'Z2',v:2},{t:'Z3',v:3}];
+    zbar.innerHTML='';
+    for(const it of items){
+      const b=document.createElement('button');
+      b.className='zbtn';
+      b.textContent=it.t;
+      b.onclick=()=>{
+        planeZ=it.v;
+        syncZBar();
+        syncInstances();
+        clearPreview();
+      };
+      zbar.appendChild(b);
+    }
+    syncZBar();
+  }
+  function syncZBar(){
+    [...zbar.querySelectorAll('.zbtn')].forEach(b=>b.classList.remove('active'));
+    [...zbar.querySelectorAll('.zbtn')].forEach(b=>{
+      const t=b.textContent;
+      const v=(t==='Tutti')?null:Number(t.slice(1));
+      if((v===null && planeZ===null) || v===planeZ) b.classList.add('active');
+    });
+  }
 
   // ===== UI events =====
   resetBtn.onclick = ()=>newGame();
@@ -954,12 +1108,12 @@
   explodeSwitch.onclick = ()=>{
     explode = toggleSwitch(explodeSwitch);
     explodeBadge.textContent = explode?'ON':'OFF';
-    rebuildInstances(); dirtyMarks=true;
+    syncInstances();
   };
 
   zDepth.oninput = ()=>{
     zScale = Number(zDepth.value);
-    rebuildInstances(); dirtyMarks=true;
+    syncInstances();
   };
 
   cpuSwitch.onclick = ()=>{
@@ -975,21 +1129,17 @@
     if(!teach) clearPreview();
   };
 
-  window.addEventListener('resize', ()=>{ dirtyMarks=true; });
+  window.addEventListener('resize', ()=>{ /* canvas resize handled in tick */ });
 
   function newGame(){
     board=Array(SIZE).fill(null);
     current='X';
     gameOver=false;
     hoveredIndex=null;
-    previewAnchor=null;
     previewLines=[];
     winLine=null;
     lineInfo.style.display='none';
-    overlay2d.innerHTML='';
-    for(let i=0;i<SIZE;i++) markEls[i]=null;
-    rebuildInstances();
-    dirtyMarks=true;
+    syncInstances();
     setStatus('Tocca a X.');
     updateTurn();
   }
@@ -1000,42 +1150,19 @@
     const VP=getVP(W,H);
     const Wm=getWorld();
 
-    // update instVis based on planeZ
-    for(let i=0;i<SIZE;i++){
-      const z=toXYZ(i).z;
-      instVis[i]=(planeZ===null || z===planeZ)?1.0:0.0;
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER,bIV);
-    gl.bufferSubData(gl.ARRAY_BUFFER,0,instVis);
-
+    // picking pass
     drawPick(VP,Wm);
 
+    // hover preview
     if(mouseMoved){
       hoveredIndex = pickAt(mouseX, mouseY);
       if(teach && hoveredIndex!=null && canPlay(hoveredIndex)) setPreviewForCell(hoveredIndex);
       else clearPreview();
       mouseMoved=false;
-      dirtyMarks=true;
     }
 
+    // main render
     drawMain(VP,Wm);
-
-    if(dirtyMarks){
-      for(let i=0;i<SIZE;i++){
-        if(!board[i]) continue;
-        if(planeZ!==null && toXYZ(i).z!==planeZ){ if(markEls[i]) markEls[i].style.display='none'; continue; }
-        ensureMarkEl(i); syncMark(i);
-        const p=pointOfIndex(i);
-        const s=project(p, VP, W, H);
-        if(!s){ markEls[i].style.display='none'; continue; }
-        const el=markEls[i];
-        el.style.left=s.x+'px';
-        el.style.top=s.y+'px';
-        const k=clamp(1.15-(s.d*0.12),0.75,1.25);
-        el.style.transform=`translate(-50%,-50%) scale(${k})`;
-      }
-      dirtyMarks=false;
-    }
 
     requestAnimationFrame(tick);
   }
@@ -1046,7 +1173,8 @@
   toggleSwitch(explodeSwitch,false); explodeBadge.textContent='OFF';
   toggleSwitch(cpuSwitch,false); cpuBadge.textContent='OFF';
   toggleSwitch(teachSwitch,true); teachBadge.textContent='ON';
-  rebuildInstances();
+
+  syncInstances();
   newGame();
   tick();
 })();
