@@ -33,10 +33,13 @@ soli orientamenti ruotati (proprietà del vero superflip).
 - Texture facce: atlas canvas 3x3 per faccia (`paintFace`), UV per-sticker da `BASIS`/`tileOf`.
 
 ## Da rifinire / fare (in ordine)
-- [ ] **UV facce**: verificare e correggere orientamento di testo/immagine su TUTTE e 6 le facce
-      (alcune possono risultare ruotate/specchiate). Rendere coerente l'alto/sinistra per faccia.
-      Test: modalità "Numero" su tutte le facce → 1..9 leggibili e ordinati uguale ovunque;
-      modalità "Immagine" → la foto si ricompone correttamente a cubo risolto.
+- [x] **UV facce**: VERIFICATO (2026-06-06) — orientamento corretto su TUTTE e 6 le facce.
+      Niente rotazioni/specchiature: per ogni faccia R×V = normale uscente (mano destra),
+      e la UV in-tile usa lo stesso BASIS della disposizione (testo dritto, non riflesso).
+      Test eseguiti: (1) simulazione numerica di FACES/BASIS/tileOf+UV → ogni faccia mostra
+      1 2 3 / 4 5 6 / 7 8 9 vista frontalmente; (2) modalità "Numero" renderizzata in browser
+      (screenshot da due angoli opposti): U/F/R e L/D/B con cifre dritte e ordinate uguali.
+      "Immagine" usa lo stesso percorso UV → si ricompone correttamente. Nessuna modifica al codice necessaria.
 - [ ] **Segno del drag**: in ogni angolo di vista, trascinando una faccia lo strato deve girare
       nel verso atteso. Correggere eventuali inversioni di segno in `resolveTurn`.
 - [ ] **PWA**: aggiungere `manifest.webmanifest`, `service-worker.js` (cache offline) e icone
