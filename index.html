@@ -1,1417 +1,634 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Tris 3D vero — 4×4×4 (WebGL2, X/O mesh)</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Il Cubo di PezzaliApp — 3×3×3 (WebGL2)</title>
+<style>
+  :root{
+    --bg:#070a10; --text:#e9eef7; --muted:#9fb0c8; --line: rgba(255,255,255,.12);
+    --panel: rgba(18,26,39,.55); --shadow: 0 18px 55px rgba(0,0,0,.45); --radius: 18px;
+    --accent:#4aa3ff; --accent2:#44d19e;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 700px at 20% 10%, rgba(74,163,255,.18), transparent 55%),
+      radial-gradient(900px 700px at 80% 25%, rgba(68,209,158,.14), transparent 55%),
+      radial-gradient(1000px 800px at 60% 90%, rgba(255,255,255,.06), transparent 60%),
+      var(--bg);
+    overflow:hidden;
+  }
+  .app{ height:100dvh; display:grid; grid-template-columns: 1.25fr .75fr; gap:18px; padding:18px; }
+  .panel{
+    border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+    background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    backdrop-filter: blur(10px); overflow:hidden; min-height:0;
+  }
+  .hdr{ padding:18px 18px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+        display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  h1{margin:0;font-size:18px;letter-spacing:.3px;font-weight:950}
+  h1 .gr{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.35}
+  .badge{ font-size:12px;color:var(--muted); border:1px solid var(--line); padding:6px 10px;
+          border-radius:999px; background:rgba(0,0,0,.18); white-space:nowrap; }
+  .content{padding:18px; padding-bottom:12px;}
+  .status{ display:flex;align-items:center;justify-content:space-between;gap:12px;
+           padding:12px 14px;border:1px solid var(--line);border-radius:14px;
+           background:rgba(0,0,0,.18); }
+  .status .mini{color:var(--muted);font-size:12px}
+  #statusText{font-weight:950}
+  .pill{ font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+         color:var(--muted);background:rgba(255,255,255,.03); user-select:none; }
+  .pill.win{border-color:rgba(68,209,158,.5); color:#bff3df; background:rgba(68,209,158,.14)}
 
-  <style>
-    :root{
-      --bg:#070a10; --text:#e9eef7; --muted:#9fb0c8; --line: rgba(255,255,255,.12);
-      --panel: rgba(18,26,39,.55); --shadow: 0 18px 55px rgba(0,0,0,.45); --radius: 18px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      color: var(--text);
-      background:
-        radial-gradient(1100px 700px at 20% 10%, rgba(74,163,255,.18), transparent 55%),
-        radial-gradient(900px 700px at 80% 25%, rgba(68,209,158,.14), transparent 55%),
-        radial-gradient(1000px 800px at 60% 90%, rgba(255,255,255,.06), transparent 60%),
-        var(--bg);
-      overflow:hidden;
-    }
+  #viewport{ width:100%; flex:1; min-height:520px; position:relative; overflow:hidden;
+    border-top:1px solid rgba(255,255,255,.06);
+    background: radial-gradient(700px 500px at 40% 15%, rgba(255,255,255,.05), transparent 60%); }
+  canvas{ display:block; width:100%; height:100%; touch-action:none;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .hud{ position:absolute; left:12px; bottom:12px; z-index:6; pointer-events:none;
+    background: rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.10);
+    color: rgba(255,255,255,.88); padding:10px 12px; border-radius:14px;
+    font-size:12px; backdrop-filter: blur(8px); }
 
-    /* LAYOUT DESKTOP */
-    .app{
-      height:100dvh;
-      display:grid;
-      grid-template-columns: 1.25fr .75fr;
-      gap:18px;
-      padding:18px;
-    }
+  .rightPanel{ display:flex; flex-direction:column; overflow:auto; -webkit-overflow-scrolling: touch; }
+  .rightPanel .hdr{ position:sticky; top:0; z-index:20; }
+  .section{padding:16px 18px;border-top:1px solid var(--line)}
+  .section:first-child{border-top:none}
+  .section h2{ margin:0 0 10px;font-size:14px;letter-spacing:.2px;color:var(--muted);
+    font-weight:950;text-transform:uppercase; }
 
-    .panel{
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-      backdrop-filter: blur(10px);
-      overflow:hidden;
-      min-height:0; /* IMPORTANTISSIMO per scroll/fit */
-    }
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .btn{ border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text);
+    padding:11px 12px;border-radius:14px;cursor:pointer;font-weight:950; transition:transform .06s ease, background .15s ease;}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14)}
+  .btn.good{border-color: rgba(68,209,158,.35); background: rgba(68,209,158,.12)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
 
-    .hdr{
-      padding:18px 18px 12px;
-      border-bottom:1px solid var(--line);
-      background:var(--panel);
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-    }
+  .moves{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .mv{ border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text);
+    padding:10px 0;border-radius:12px;cursor:pointer;font-weight:950;font-size:15px;user-select:none;
+    display:flex;align-items:center;justify-content:center;gap:2px}
+  .mv .inv{font-size:11px;opacity:.7}
+  .mv:active{transform:translateY(1px)}
+  .legend{display:flex;flex-wrap:wrap;gap:8px}
+  .lg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .sw{width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.25)}
 
-    h1{margin:0;font-size:18px;letter-spacing:.2px}
-    .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.35}
-    .badge{
-      font-size:12px;color:var(--muted);
-      border:1px solid var(--line);
-      padding:6px 10px;border-radius:999px;
-      background:rgba(0,0,0,.18);
-      white-space:nowrap;
-    }
+  .score{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .card{border:1px solid var(--line);border-radius:16px;background:rgba(0,0,0,.16);padding:12px;}
+  .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
+  .v{font-size:22px;font-weight:950;font-variant-numeric:tabular-nums}
+  .hint{font-size:13px;color:var(--muted);line-height:1.5;margin:8px 0 0}
 
-    .content{padding:18px}
-    .status{
-      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
-      padding:12px 14px;border:1px solid var(--line);border-radius:14px;
-      background:rgba(0,0,0,.18);margin-bottom:14px;
-    }
-    .status .mini{color:var(--muted);font-size:12px}
-    .pill{
-      font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
-      color:var(--muted);background:rgba(255,255,255,.03);
-      user-select:none;align-self:flex-start;
-    }
-    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
-    .btn{
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      padding:11px 12px;border-radius:14px;cursor:pointer;font-weight:950;
-    }
-    .btn.primary{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14)}
-    .btn.danger{border-color: rgba(255,74,106,.35); background: rgba(255,74,106,.10)}
+  .errorbox{ position:absolute; inset:0; display:none; place-items:center; z-index:50;
+    background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px; }
+  .errorcard{ width:min(720px,100%); border:1px solid rgba(255,255,255,.14); border-radius:18px;
+    background: rgba(10,14,22,.72); padding:16px; box-shadow: var(--shadow); }
+  .errorcard pre{ white-space:pre-wrap; color: rgba(255,255,255,.85); background: rgba(0,0,0,.25);
+    border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;margin:10px 0 0;
+    font-size:12px;line-height:1.4; }
 
-    /* VIEWPORT */
-    #viewport{
-      width:100%;
-      flex:1;
-      min-height:520px;
-      position:relative;
-      overflow:hidden;
-      border-top:1px solid rgba(255,255,255,.06);
-      background: radial-gradient(700px 500px at 40% 15%, rgba(255,255,255,.05), transparent 60%);
-    }
-
-    /* Canvas: FIX iOS (rotazione/pan) */
-    canvas{
-      display:block;
-      width:100%;
-      height:100%;
-      touch-action:none;          /* fondamentale su iPhone */
-      -webkit-user-select:none;
-      user-select:none;
-      -webkit-touch-callout:none;
-    }
-
-    .hud{
-      position:absolute; left:12px; bottom:12px; z-index:6; pointer-events:none;
-      background: rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.10);
-      color: rgba(255,255,255,.88); padding:10px 12px; border-radius:14px;
-      font-size:12px; backdrop-filter: blur(8px);
-    }
-
-    /* PANNELLO DESTRO: SCROLL PER FAR VEDERE SEMPRE IL PUNTEGGIO */
-    .rightPanel{
-      display:flex;
-      flex-direction:column;
-      overflow:auto;                 /* così il Punteggio non “sparisce” */
-      -webkit-overflow-scrolling: touch;
-    }
-    .rightPanel .hdr{
-      position:sticky;
-      top:0;
-      z-index:20;
-    }
-
-    .section{padding:16px 18px;border-top:1px solid var(--line)}
-    .section h2{
-      margin:0 0 10px;font-size:14px;letter-spacing:.2px;color:var(--muted);
-      font-weight:950;text-transform:uppercase;
-    }
-
-    .row{
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      padding:10px 12px;border-radius:14px;border:1px solid var(--line);
-      background:rgba(0,0,0,.16);margin-bottom:10px;
-    }
-
-    label{font-size:13px;font-weight:950}
-    input[type="range"]{width:200px}
-
-    .toggle{display:flex;align-items:center;gap:10px;user-select:none;}
-    .switch{
-      width:46px;height:26px;border-radius:999px;border:1px solid var(--line);
-      background:rgba(255,255,255,.04);position:relative;cursor:pointer;flex:0 0 auto;
-    }
-    .knob{
-      width:20px;height:20px;border-radius:999px;background:rgba(255,255,255,.75);
-      position:absolute;top:2px;left:2px;transition:left .18s ease, background .18s ease;
-    }
-    .switch.on{border-color: rgba(74,163,255,.35); background: rgba(74,163,255,.14);}
-    .switch.on .knob{left:24px;background: rgba(255,255,255,.92);}
-
-    .zbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-    .zbtn{
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      padding:8px 10px;border-radius:12px;cursor:pointer;
-      font-weight:950;font-size:12px;user-select:none;
-    }
-    .zbtn.active{border-color: rgba(74,163,255,.45); background: rgba(74,163,255,.16);}
-
-    select{
-      background:rgba(255,255,255,.04);color:var(--text);
-      border:1px solid rgba(255,255,255,.14);
-      padding:8px 10px;border-radius:12px;font-weight:900;cursor:pointer;min-width:180px;
-    }
-
-    .score{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-    .card{border:1px solid var(--line);border-radius:16px;background:rgba(0,0,0,.16);padding:12px;}
-    .k{font-size:12px;color:var(--muted);font-weight:950;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
-    .v{font-size:22px;font-weight:950}
-    .hint{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
-
-    .errorbox{
-      position:absolute; inset:0; display:none; place-items:center; z-index:50;
-      background: rgba(0,0,0,.55); backdrop-filter: blur(8px); padding:18px;
-    }
-    .errorcard{
-      width:min(720px,100%);
-      border:1px solid rgba(255,255,255,.14);
-      border-radius:18px;
-      background: rgba(10,14,22,.72);
-      padding:16px;
-      box-shadow: var(--shadow);
-    }
-    .errorcard pre{
-      white-space:pre-wrap;
-      color: rgba(255,255,255,.85);
-      background: rgba(0,0,0,.25);
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      padding:12px;margin:10px 0 0;
-      font-size:12px;line-height:1.4;
-    }
-
-    /* MOBILE */
-    @media (max-width: 900px){
-      body{
-        overflow:auto;
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-      .app{
-        height:auto;
-        grid-template-columns:1fr;
-        padding:14px;
-        gap:14px;
-      }
-      #viewport{
-        height:60svh;     /* svh = stabile su iOS Safari */
-        min-height:420px;
-      }
-      input[type="range"]{width:180px}
-      select{min-width:160px}
-    }
-  </style>
+  @media (max-width: 900px){
+    body{ overflow:auto; padding-bottom: env(safe-area-inset-bottom); }
+    .app{ height:auto; grid-template-columns:1fr; padding:14px; gap:14px; }
+    #viewport{ height:58svh; min-height:380px; }
+  }
+</style>
 </head>
-
 <body>
-  <div class="app">
-    <!-- LEFT -->
-    <div class="panel" style="display:flex; flex-direction:column;">
-      <div class="hdr">
+<div class="app">
+  <!-- LEFT -->
+  <div class="panel" style="display:flex; flex-direction:column;">
+    <div class="hdr">
+      <div>
+        <h1>Il <span class="gr">Cubo di PezzaliApp</span> — 3×3×3</h1>
+        <div class="sub">Trascina una faccia per ruotare lo strato. Drag fuori dal cubo = orbita.</div>
+      </div>
+      <div class="badge">REAL 3D · WebGL2</div>
+    </div>
+
+    <div class="content">
+      <div class="status" aria-live="polite">
         <div>
-          <h1>Tris Rivisitato in 3D— 4×4×4</h1>
-          <div class="sub">Ruota/zoom e clicca i cubetti. 4 in linea in qualunque direzione.</div>
+          <div class="mini">Stato</div>
+          <div id="statusText">Pronto. Premi “Mischia”.</div>
         </div>
-        <div class="badge" id="linesBadge">Linee: …</div>
-      </div>
-
-      <div class="content" style="padding-bottom:12px;">
-        <div class="status" aria-live="polite">
-          <div>
-            <div class="mini">Stato</div>
-            <div id="statusText"><strong>Tocca a X.</strong></div>
-            <div class="mini" id="lineInfo" style="margin-top:4px; display:none;"></div>
-          </div>
-          <div class="pill" id="turnPill">Turno: X</div>
-        </div>
-
-        <div class="controls">
-          <button class="btn primary" id="resetBtn">Nuova partita</button>
-          <button class="btn danger" id="resetScoreBtn">Azzera punteggio</button>
-        </div>
-      </div>
-
-      <div id="viewport">
-        <canvas id="gl"></canvas>
-        <div class="hud">Drag = ruota • Scroll = zoom • Shift+Drag = pan • Hover = preview (se ON)</div>
-
-        <div class="errorbox" id="errorbox">
-          <div class="errorcard">
-            <h3 style="margin:0 0 6px">WebGL non avviato</h3>
-            <div class="hint">Se vedi questo, il contesto WebGL2 non è stato creato oppure shader/driver bloccati.</div>
-            <pre id="errortext"></pre>
-          </div>
-        </div>
+        <div class="pill" id="solvedPill">—</div>
       </div>
     </div>
 
-    <!-- RIGHT -->
-    <div class="panel rightPanel">
-      <div class="hdr">
-        <div>
-          <h1>Controlli</h1>
-          <div class="sub">Filtro Z, CPU e didattica.</div>
-        </div>
-        <div class="badge">REAL 3D</div>
-      </div>
-
-      <div class="section">
-        <h2>Vista</h2>
-        <div class="row">
-          <label for="zDepth">Profondità Z</label>
-          <input id="zDepth" type="range" min="0.7" max="2.2" step="0.01" value="1.0" />
-        </div>
-
-        <div class="row">
-          <div class="toggle">
-            <div class="switch" id="explodeSwitch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
-            <div>
-              <div style="font-weight:950;font-size:13px">Esplodi livelli</div>
-              <p class="hint">Aumenta spacing tra Z0..Z3</p>
-            </div>
-          </div>
-          <div class="badge" id="explodeBadge">OFF</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>Gioca a piani (Z)</h2>
-        <div class="row" style="align-items:flex-start;">
-          <div>
-            <div style="font-weight:950;font-size:13px">Selettore livello</div>
-            <p class="hint">In Z0..Z3 puoi cliccare solo su quel piano</p>
-          </div>
-          <div class="zbar" id="zbar"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>CPU</h2>
-        <div class="row">
-          <div class="toggle">
-            <div class="switch" id="cpuSwitch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
-            <div>
-              <div style="font-weight:950;font-size:13px">Vs CPU</div>
-              <p class="hint">La CPU gioca con <b>O</b></p>
-            </div>
-          </div>
-          <div class="badge" id="cpuBadge">OFF</div>
-        </div>
-
-        <div class="row">
-          <label for="cpuLevel">Difficoltà</label>
-          <select id="cpuLevel">
-            <option value="easy">Facile</option>
-            <option value="normal" selected>Normale</option>
-            <option value="hard">Difficile</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>Didattica</h2>
-        <div class="row">
-          <div class="toggle">
-            <div class="switch on" id="teachSwitch" role="switch" aria-checked="true" tabindex="0"><div class="knob"></div></div>
-            <div>
-              <div style="font-weight:950;font-size:13px">Preview linee</div>
-              <p class="hint">Hover su cubetto vuoto: mostra linee possibili</p>
-            </div>
-          </div>
-          <div class="badge" id="teachBadge">ON</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>Punteggio</h2>
-        <div class="score">
-          <div class="card"><div class="k">X</div><div class="v" id="scoreX">0</div></div>
-          <div class="card"><div class="k">O</div><div class="v" id="scoreO">0</div></div>
+    <div id="viewport">
+      <canvas id="gl"></canvas>
+      <div class="hud">Drag faccia = ruota strato • Drag fuori = orbita • Scroll/Pinch = zoom</div>
+      <div class="errorbox" id="errorbox">
+        <div class="errorcard">
+          <h3 style="margin:0 0 6px">WebGL non avviato</h3>
+          <div class="hint">Il contesto WebGL2 non è stato creato, oppure shader/driver bloccati.</div>
+          <pre id="errortext"></pre>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- RIGHT -->
+  <div class="panel rightPanel">
+    <div class="hdr">
+      <div><h1>Controlli</h1><div class="sub">Mosse, mescola e statistiche.</div></div>
+      <div class="badge">PezzaliApp</div>
+    </div>
+
+    <div class="section">
+      <h2>Partita</h2>
+      <div class="controls">
+        <button class="btn primary" id="scrambleBtn">Mischia</button>
+        <button class="btn good" id="solveBtn">Reset cubo</button>
+        <button class="btn" id="undoBtn">↶ Annulla</button>
+        <button class="btn" id="redoBtn">↷ Ripeti</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Mosse</h2>
+      <div class="moves" id="moveGrid"></div>
+      <p class="hint">Tocca per ruotare in senso orario; usa il pulsante con l’apostrofo (’) per l’inverso. Da tastiera: U D L R F B (Shift = inverso).</p>
+    </div>
+
+    <div class="section">
+      <h2>Facce</h2>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="section">
+      <h2>Statistiche</h2>
+      <div class="score">
+        <div class="card"><div class="k">Tempo</div><div class="v" id="timeV">00:00.0</div></div>
+        <div class="card"><div class="k">Mosse</div><div class="v" id="moveV">0</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (() => {
-  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  "use strict";
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const showError=(m)=>{const e=document.getElementById('errortext');if(e)e.textContent=m;
+    const b=document.getElementById('errorbox');if(b)b.style.display='grid';};
 
-  function showError(msg){
-    const e = document.getElementById('errortext');
-    if(e) e.textContent = msg;
-    const box = document.getElementById('errorbox');
-    if(box) box.style.display = 'grid';
-  }
-
-  // DOM
-  const linesBadge    = document.getElementById('linesBadge');
-  const statusText    = document.getElementById('statusText');
-  const turnPill      = document.getElementById('turnPill');
-  const lineInfo      = document.getElementById('lineInfo');
-  const resetBtn      = document.getElementById('resetBtn');
-  const resetScoreBtn = document.getElementById('resetScoreBtn');
-  const zDepth        = document.getElementById('zDepth');
-  const explodeSwitch = document.getElementById('explodeSwitch');
-  const explodeBadge  = document.getElementById('explodeBadge');
-  const cpuSwitch     = document.getElementById('cpuSwitch');
-  const cpuBadge      = document.getElementById('cpuBadge');
-  const cpuLevelSel   = document.getElementById('cpuLevel');
-  const teachSwitch   = document.getElementById('teachSwitch');
-  const teachBadge    = document.getElementById('teachBadge');
-  const zbar          = document.getElementById('zbar');
-  const scoreXEl      = document.getElementById('scoreX');
-  const scoreOEl      = document.getElementById('scoreO');
-
-  function setStatus(msg){ statusText.innerHTML = `<strong>${msg}</strong>`; }
-  function updateTurn(){ turnPill.textContent = `Turno: ${current}`; }
-  function updateScores(){ scoreXEl.textContent=score.X; scoreOEl.textContent=score.O; }
-
-  function toggleSwitch(el, forced){
-    if(forced===undefined) el.classList.toggle('on');
-    else el.classList.toggle('on', !!forced);
-    el.setAttribute('aria-checked', el.classList.contains('on')?'true':'false');
-    return el.classList.contains('on');
-  }
-
-  // Mat4 minimal (column-major)
+  // ---------- math: mat4 (column-major) ----------
   const mat4={
     I:()=>{const m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m;},
     mul:(a,b)=>{const o=new Float32Array(16);
-      for(let c=0;c<4;c++)for(let r=0;r<4;r++){
+      for(let c=0;c<4;c++)for(let r=0;r<4;r++)
         o[c*4+r]=a[0*4+r]*b[c*4+0]+a[1*4+r]*b[c*4+1]+a[2*4+r]*b[c*4+2]+a[3*4+r]*b[c*4+3];
-      }return o;},
+      return o;},
     rotX:(A)=>{const m=mat4.I(),c=Math.cos(A),s=Math.sin(A);m[5]=c;m[9]=-s;m[6]=s;m[10]=c;return m;},
     rotY:(A)=>{const m=mat4.I(),c=Math.cos(A),s=Math.sin(A);m[0]=c;m[8]=s;m[2]=-s;m[10]=c;return m;},
-    persp:(fovy,asp,n,f)=>{const t=1/Math.tan(fovy/2),m=new Float32Array(16);
-      m[0]=t/asp;m[5]=t;m[10]=(f+n)/(n-f);m[11]=-1;m[14]=(2*f*n)/(n-f);return m;},
+    rotZ:(A)=>{const m=mat4.I(),c=Math.cos(A),s=Math.sin(A);m[0]=c;m[4]=-s;m[1]=s;m[5]=c;return m;},
+    rotAxis:(ax,A)=>ax===0?mat4.rotX(A):ax===1?mat4.rotY(A):mat4.rotZ(A),
+    persp:(f,asp,n,fa)=>{const t=1/Math.tan(f/2),m=new Float32Array(16);
+      m[0]=t/asp;m[5]=t;m[10]=(fa+n)/(n-fa);m[11]=-1;m[14]=(2*fa*n)/(n-fa);return m;},
     lookAt:(e,t,u)=>{
-      let zx=e[0]-t[0], zy=e[1]-t[1], zz=e[2]-t[2];
-      const zL=Math.hypot(zx,zy,zz)||1; zx/=zL; zy/=zL; zz/=zL;
-      let xx=u[1]*zz-u[2]*zy, xy=u[2]*zx-u[0]*zz, xz=u[0]*zy-u[1]*zx;
-      const xL=Math.hypot(xx,xy,xz)||1; xx/=xL; xy/=xL; xz/=xL;
-      const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
-      const m=mat4.I();
-      m[0]=xx;m[4]=xy;m[8]=xz;
-      m[1]=yx;m[5]=yy;m[9]=yz;
-      m[2]=zx;m[6]=zy;m[10]=zz;
-      m[12]=-(xx*e[0]+xy*e[1]+xz*e[2]);
-      m[13]=-(yx*e[0]+yy*e[1]+yz*e[2]);
-      m[14]=-(zx*e[0]+zy*e[1]+zz*e[2]);
-      return m;
-    }
+      let zx=e[0]-t[0],zy=e[1]-t[1],zz=e[2]-t[2];const zL=Math.hypot(zx,zy,zz)||1;zx/=zL;zy/=zL;zz/=zL;
+      let xx=u[1]*zz-u[2]*zy,xy=u[2]*zx-u[0]*zz,xz=u[0]*zy-u[1]*zx;const xL=Math.hypot(xx,xy,xz)||1;xx/=xL;xy/=xL;xz/=xL;
+      const yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx;const m=mat4.I();
+      m[0]=xx;m[4]=xy;m[8]=xz; m[1]=yx;m[5]=yy;m[9]=yz; m[2]=zx;m[6]=zy;m[10]=zz;
+      m[12]=-(xx*e[0]+xy*e[1]+xz*e[2]); m[13]=-(yx*e[0]+yy*e[1]+yz*e[2]); m[14]=-(zx*e[0]+zy*e[1]+zz*e[2]);
+      return m;},
+    fromM3T:(m3,t)=>{const m=new Float32Array(16);
+      for(let r=0;r<3;r++)for(let c=0;c<3;c++) m[c*4+r]=m3[r*3+c];
+      m[12]=t[0];m[13]=t[1];m[14]=t[2];m[15]=1;return m;}
   };
 
-  // GAME
-  const N=4, SIZE=N*N*N;
-  const idx=(x,y,z)=>z*N*N + y*N + x;
-  const toXYZ=(i)=>{
-    const z=Math.floor(i/(N*N));
-    const r=i%(N*N);
-    const y=Math.floor(r/N);
-    const x=r%N;
-    return {x,y,z};
-  };
-  const inBounds=(x,y,z)=>x>=0&&x<N&&y>=0&&y<N&&z>=0&&z<N;
+  // ---------- integer 3x3 rotations (row-major), local->world ----------
+  const ID3=[1,0,0, 0,1,0, 0,0,1];
+  const RX=[1,0,0, 0,0,-1, 0,1,0];
+  const RY=[0,0,1, 0,1,0, -1,0,0];
+  const RZ=[0,-1,0, 1,0,0, 0,0,1];
+  const transpose3=(m)=>[m[0],m[3],m[6], m[1],m[4],m[7], m[2],m[5],m[8]];
+  const RXi=transpose3(RX), RYi=transpose3(RY), RZi=transpose3(RZ);
+  const rotInt=(ax,dir)=> ax===0?(dir>0?RX:RXi) : ax===1?(dir>0?RY:RYi) : (dir>0?RZ:RZi);
+  const m3mul=(A,B)=>{const o=new Array(9);
+    for(let r=0;r<3;r++)for(let c=0;c<3;c++) o[r*3+c]=A[r*3+0]*B[0*3+c]+A[r*3+1]*B[1*3+c]+A[r*3+2]*B[2*3+c];
+    return o;};
+  const m3vec=(M,v)=>[ M[0]*v[0]+M[1]*v[1]+M[2]*v[2], M[3]*v[0]+M[4]*v[1]+M[5]*v[2], M[6]*v[0]+M[7]*v[1]+M[8]*v[2] ];
+  const isID=(m)=>{for(let i=0;i<9;i++) if(m[i]!==ID3[i]) return false; return true;};
 
-  function generateLines(n){
-    const dirs=[];
-    for(let dx=-1;dx<=1;dx++)
-      for(let dy=-1;dy<=1;dy++)
-        for(let dz=-1;dz<=1;dz++){
-          if(dx===0&&dy===0&&dz===0) continue;
-          const firstNonZero=(dx!==0)?dx:(dy!==0?dy:dz);
-          if(firstNonZero<0) continue;
-          dirs.push([dx,dy,dz]);
-        }
-    const set=new Set(), lines=[];
-    for(let z=0;z<n;z++) for(let y=0;y<n;y++) for(let x=0;x<n;x++){
-      for(const [dx,dy,dz] of dirs){
-        const coords=[];
-        let ok=true;
-        for(let k=0;k<n;k++){
-          const xx=x+dx*k, yy=y+dy*k, zz=z+dz*k;
-          if(!inBounds(xx,yy,zz)){ok=false;break;}
-          coords.push(idx(xx,yy,zz));
-        }
-        if(!ok) continue;
-        if(inBounds(x-dx,y-dy,z-dz)) continue;
-        const key=coords.join(',');
-        if(!set.has(key)){set.add(key);lines.push(coords);}
-      }
-    }
-    return lines;
-  }
+  // ---------- WebGL2 ----------
+  const canvas=document.getElementById('gl');
+  canvas.style.touchAction='none';
+  const gl=canvas.getContext('webgl2',{antialias:true,alpha:true,depth:true});
+  if(!gl){ showError('Impossibile creare WebGL2. Usa un browser aggiornato (Chrome/Safari/Firefox).'); return; }
 
-  const WIN_LINES = generateLines(N);
-  linesBadge.textContent = `Linee: ${WIN_LINES.length}`;
-
-  const LINES_THROUGH = Array.from({length:SIZE},()=>[]);
-  for(const line of WIN_LINES) for(const c of line) LINES_THROUGH[c].push(line);
-
-  let board=Array(SIZE).fill(null);
-  let current='X';
-  let gameOver=false;
-
-  let vsCPU=false;
-  let cpuLevel='normal';
-  let teach=true;
-
-  let explode=false;
-  let zScale=1.0;
-  let planeZ=null;
-
-  let score={X:0,O:0};
-
-  let hoveredIndex=null;
-  let previewLines=[];
-  let winLine=null;
-
-  // WebGL2
-  const canvas = document.getElementById('gl');
-  canvas.style.touchAction = 'none';
-
-  const gl = canvas.getContext('webgl2', {antialias:true, alpha:true, depth:true});
-  if(!gl){
-    showError('Impossibile creare WebGL2. Prova Chrome/Safari aggiornato o abilita WebGL.');
-    return;
-  }
-
-  function compile(type, src){
-    const s=gl.createShader(type);
-    gl.shaderSource(s,src);
-    gl.compileShader(s);
-    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
-      const info=gl.getShaderInfoLog(s);
-      gl.deleteShader(s);
-      throw new Error(info);
-    }
-    return s;
-  }
-  function link(vs,fs){
-    const p=gl.createProgram();
-    gl.attachShader(p,vs); gl.attachShader(p,fs);
-    gl.linkProgram(p);
-    if(!gl.getProgramParameter(p, gl.LINK_STATUS)){
-      const info=gl.getProgramInfoLog(p);
-      gl.deleteProgram(p);
-      throw new Error(info);
-    }
-    return p;
-  }
+  const compile=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){const i=gl.getShaderInfoLog(s);gl.deleteShader(s);throw new Error(i);}return s;};
+  const link=(vs,fs)=>{const p=gl.createProgram();gl.attachShader(p,vs);gl.attachShader(p,fs);gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const i=gl.getProgramInfoLog(p);gl.deleteProgram(p);throw new Error(i);}return p;};
 
   const vsLit=`#version 300 es
   precision highp float;
   layout(location=0) in vec3 aPos;
   layout(location=1) in vec3 aNor;
-  layout(location=2) in vec3  iT;
-  layout(location=3) in vec4  iCol;
-  layout(location=4) in float iVis;
-  layout(location=6) in float iS;
-  uniform mat4 uVP;
-  uniform mat4 uW;
-  out vec3 vN;
-  out vec3 vP;
-  out vec4 vC;
-  out float vV;
+  layout(location=2) in vec3 aCol;
+  uniform mat4 uVP, uModel;
+  out vec3 vN; out vec3 vP; out vec3 vC;
   void main(){
-    vV=iVis;
-    vec3 pLocal=aPos*iS;
-    vec4 p=uW*vec4(pLocal+iT,1.0);
-    gl_Position=uVP*p;
-    vP=p.xyz;
-    vN=mat3(uW)*aNor;
-    vC=iCol;
+    vec4 p=uModel*vec4(aPos,1.0);
+    gl_Position=uVP*p; vP=p.xyz;
+    vN=mat3(uModel)*aNor; vC=aCol;
   }`;
-
   const fsLit=`#version 300 es
   precision highp float;
-  in vec3 vN;
-  in vec3 vP;
-  in vec4 vC;
-  in float vV;
-  out vec4 o;
+  in vec3 vN; in vec3 vP; in vec3 vC; out vec4 o;
   void main(){
-    if(vV<0.5) discard;
     vec3 n=normalize(vN);
-    vec3 l=normalize(vec3(0.55,1.0,0.75));
+    vec3 l=normalize(vec3(0.5,1.0,0.75));
     float d=max(dot(n,l),0.0);
     vec3 v=normalize(-vP);
-    float rim=pow(1.0-max(dot(n,v),0.0),2.2);
-    vec3 col=vC.rgb*(0.34+0.76*d)+vec3(0.22)*rim;
-    o=vec4(col,vC.a);
+    float rim=pow(1.0-max(dot(n,v),0.0),2.5);
+    vec3 col=vC*(0.42+0.66*d)+vec3(0.10)*rim;
+    o=vec4(col,1.0);
   }`;
-
   const vsPick=`#version 300 es
   precision highp float;
   layout(location=0) in vec3 aPos;
-  layout(location=2) in vec3 iT;
-  layout(location=4) in float iVis;
-  layout(location=5) in vec3 iPick;
-  uniform mat4 uVP;
-  uniform mat4 uW;
-  out vec3 vPick; out float vV;
-  void main(){
-    vV=iVis; vPick=iPick;
-    gl_Position=uVP*(uW*vec4(aPos+iT,1.0));
-  }`;
-
+  layout(location=3) in float aFace;
+  uniform mat4 uVP, uModel;
+  flat out float vFace;
+  void main(){ vFace=aFace; gl_Position=uVP*(uModel*vec4(aPos,1.0)); }`;
   const fsPick=`#version 300 es
   precision highp float;
-  in vec3 vPick; in float vV;
-  out vec4 o;
-  void main(){ if(vV<0.5) discard; o=vec4(vPick,1.0); }`;
+  flat in float vFace; out vec4 o;
+  uniform float uBase;
+  void main(){
+    float code=uBase+vFace;
+    float r=mod(code,256.0);
+    float g=mod(floor(code/256.0),256.0);
+    float b=floor(code/65536.0);
+    o=vec4(r/255.0,g/255.0,b/255.0,1.0);
+  }`;
 
-  const vsLine=`#version 300 es
-  precision highp float;
-  layout(location=0) in vec3 aPos;
-  uniform mat4 uVP;
-  void main(){ gl_Position=uVP*vec4(aPos,1.0); }`;
+  let PLIT,PPICK;
+  try{ PLIT=link(compile(gl.VERTEX_SHADER,vsLit),compile(gl.FRAGMENT_SHADER,fsLit));
+       PPICK=link(compile(gl.VERTEX_SHADER,vsPick),compile(gl.FRAGMENT_SHADER,fsPick)); }
+  catch(e){ showError('Shader error:\n'+(e.message||e)); return; }
 
-  const fsLine=`#version 300 es
-  precision highp float;
-  uniform vec4 uCol;
-  out vec4 o;
-  void main(){ o=uCol; }`;
+  const uLitVP=gl.getUniformLocation(PLIT,'uVP'), uLitM=gl.getUniformLocation(PLIT,'uModel');
+  const uPickVP=gl.getUniformLocation(PPICK,'uVP'), uPickM=gl.getUniformLocation(PPICK,'uModel'), uPickB=gl.getUniformLocation(PPICK,'uBase');
 
-  let PLIT, PPICK, PLINE;
-  try{
-    PLIT = link(compile(gl.VERTEX_SHADER,vsLit), compile(gl.FRAGMENT_SHADER,fsLit));
-    PPICK = link(compile(gl.VERTEX_SHADER,vsPick), compile(gl.FRAGMENT_SHADER,fsPick));
-    PLINE = link(compile(gl.VERTEX_SHADER,vsLine), compile(gl.FRAGMENT_SHADER,fsLine));
-  }catch(e){
-    showError('Shader error:\n'+(e.message||String(e)));
-    return;
-  }
+  // ---------- colours ----------
+  const hex=(h)=>[((h>>16)&255)/255,((h>>8)&255)/255,(h&255)/255];
+  const DARK=hex(0x14181f);
+  const FACE_COL={ // 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
+    0:hex(0xE23B3B), 1:hex(0xFF8C1A), 2:hex(0xF4F4F4),
+    3:hex(0xFFD400), 4:hex(0x2BD96B), 5:hex(0x2E7BE6)
+  };
+  const FACE_NAME={0:'Destra',1:'Sinistra',2:'Su',3:'Giù',4:'Fronte',5:'Retro'};
 
-  // Geometry
-  function mergeMeshes(meshes){
-    let totalV=0, totalI=0;
-    for(const m of meshes){ totalV += m.pos.length/3; totalI += m.idx.length; }
-    const pos=new Float32Array(totalV*3);
-    const nor=new Float32Array(totalV*3);
-    const idx=new Uint32Array(totalI);
-    let vOff=0, iOff=0;
-    for(const m of meshes){
-      pos.set(m.pos, vOff*3);
-      nor.set(m.nor, vOff*3);
-      for(let k=0;k<m.idx.length;k++) idx[iOff+k] = m.idx[k] + vOff;
-      vOff += m.pos.length/3;
-      iOff += m.idx.length;
-    }
-    return {pos,nor,idx};
-  }
+  const H=0.46;
+  const FACES=[
+    {ax:0,s:+1,nor:[1,0,0],  v:[[H,-H,-H],[H,H,-H],[H,H,H],[H,-H,H]]},
+    {ax:0,s:-1,nor:[-1,0,0], v:[[-H,-H,H],[-H,H,H],[-H,H,-H],[-H,-H,-H]]},
+    {ax:1,s:+1,nor:[0,1,0],  v:[[-H,H,-H],[-H,H,H],[H,H,H],[H,H,-H]]},
+    {ax:1,s:-1,nor:[0,-1,0], v:[[-H,-H,H],[-H,-H,-H],[H,-H,-H],[H,-H,H]]},
+    {ax:2,s:+1,nor:[0,0,1],  v:[[-H,-H,H],[H,-H,H],[H,H,H],[-H,H,H]]},
+    {ax:2,s:-1,nor:[0,0,-1], v:[[H,-H,-H],[-H,-H,-H],[-H,H,-H],[H,H,-H]]}
+  ];
+  const STK=0.40, LIFT=H+0.012;
 
-  function makeCube(){
-    const p=[], n=[], idxs=[];
-    const faces=[
-      {nor:[ 1,0,0],v:[[ .5,-.5,-.5],[ .5,.5,-.5],[ .5,.5,.5],[ .5,-.5,.5]]},
-      {nor:[-1,0,0],v:[[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-.5,-.5,-.5]]},
-      {nor:[0, 1,0],v:[[-.5,.5,-.5],[-.5,.5,.5],[ .5,.5,.5],[ .5,.5,-.5]]},
-      {nor:[0,-1,0],v:[[-.5,-.5,.5],[-.5,-.5,-.5],[ .5,-.5,-.5],[ .5,-.5,.5]]},
-      {nor:[0,0, 1],v:[[-.5,-.5,.5],[ .5,-.5,.5],[ .5,.5,.5],[-.5,.5,.5]]},
-      {nor:[0,0,-1],v:[[ .5,-.5,-.5],[-.5,-.5,-.5],[-.5,.5,-.5],[ .5,.5,-.5]]},
-    ];
-    let vi=0;
-    for(const f of faces){
-      p.push(...f.v[0],...f.v[1],...f.v[2],...f.v[3]);
-      for(let k=0;k<4;k++) n.push(...f.nor);
-      idxs.push(vi,vi+1,vi+2, vi,vi+2,vi+3);
-      vi+=4;
-    }
-    return {pos:new Float32Array(p), nor:new Float32Array(n), idx:new Uint16Array(idxs)};
-  }
-
-  function makeBox(w,h,d){
-    const x=w/2,y=h/2,z=d/2;
-    const faces=[
-      {nor:[ 1,0,0], v:[[ x,-y,-z],[ x, y,-z],[ x, y, z],[ x,-y, z]]},
-      {nor:[-1,0,0], v:[[-x,-y, z],[-x, y, z],[-x, y,-z],[-x,-y,-z]]},
-      {nor:[0, 1,0], v:[[-x, y,-z],[-x, y, z],[ x, y, z],[ x, y,-z]]},
-      {nor:[0,-1,0], v:[[-x,-y, z],[-x,-y,-z],[ x,-y,-z],[ x,-y, z]]},
-      {nor:[0,0, 1], v:[[-x,-y, z],[ x,-y, z],[ x, y, z],[-x, y, z]]},
-      {nor:[0,0,-1], v:[[ x,-y,-z],[-x,-y,-z],[-x, y,-z],[ x, y,-z]]},
-    ];
-    const p=[], n=[], idx=[];
-    let vi=0;
-    for(const f of faces){
-      p.push(...f.v[0],...f.v[1],...f.v[2],...f.v[3]);
-      for(let k=0;k<4;k++) n.push(...f.nor);
-      idx.push(vi,vi+1,vi+2, vi,vi+2,vi+3);
-      vi+=4;
-    }
-    return {pos:new Float32Array(p), nor:new Float32Array(n), idx:new Uint16Array(idx)};
-  }
-
-  function rotateZ(mesh, a){
-    const c=Math.cos(a), s=Math.sin(a);
-    const pos=new Float32Array(mesh.pos.length);
-    const nor=new Float32Array(mesh.nor.length);
-    for(let i=0;i<mesh.pos.length;i+=3){
-      const x=mesh.pos[i], y=mesh.pos[i+1], z=mesh.pos[i+2];
-      pos[i]=c*x - s*y; pos[i+1]=s*x + c*y; pos[i+2]=z;
-      const nx=mesh.nor[i], ny=mesh.nor[i+1], nz=mesh.nor[i+2];
-      nor[i]=c*nx - s*ny; nor[i+1]=s*nx + c*ny; nor[i+2]=nz;
-    }
-    return {pos,nor,idx:mesh.idx};
-  }
-
-  function makeXMesh(){
-    const bar = makeBox(0.85, 0.16, 0.10);
-    const a = Math.PI/4;
-    return mergeMeshes([rotateZ(bar,a), rotateZ(bar,-a)]);
-  }
-
-  function makeTorus(R=0.33, r=0.095, segU=40, segV=20){
-    const pos=[], nor=[], idx=[];
-    for(let i=0;i<=segU;i++){
-      const u=i/segU * Math.PI*2;
-      const cu=Math.cos(u), su=Math.sin(u);
-      for(let j=0;j<=segV;j++){
-        const v=j/segV * Math.PI*2;
-        const cv=Math.cos(v), sv=Math.sin(v);
-        const x=(R + r*cv)*cu;
-        const y=(R + r*cv)*su;
-        const z=r*sv;
-        const nx=cv*cu, ny=cv*su, nz=sv;
-        pos.push(x,y,z); nor.push(nx,ny,nz);
+  function buildCubieGeo(g){
+    const pos=[],nor=[],col=[],face=[];
+    const pushQuad=(verts,n,c,f)=>{
+      const tri=[0,1,2, 0,2,3];
+      for(const k of tri){ pos.push(verts[k][0],verts[k][1],verts[k][2]); nor.push(n[0],n[1],n[2]); col.push(c[0],c[1],c[2]); face.push(f); }
+    };
+    for(let fi=0; fi<6; fi++){
+      const F=FACES[fi];
+      pushQuad(F.v, F.nor, DARK, fi);
+      if(g[F.ax]===F.s){
+        const sv=F.v.map(p=>{
+          const q=[p[0],p[1],p[2]];
+          for(let a2=0;a2<3;a2++){
+            if(a2===F.ax) q[a2]=LIFT*F.s;
+            else q[a2]=Math.sign(q[a2])*STK;
+          }
+          return q;
+        });
+        pushQuad(sv, F.nor, FACE_COL[fi], fi);
       }
     }
-    const row=segV+1;
-    for(let i=0;i<segU;i++){
-      for(let j=0;j<segV;j++){
-        const a=i*row+j, b=a+row;
-        idx.push(a,b,a+1, b,b+1,a+1);
-      }
-    }
-    return {pos:new Float32Array(pos), nor:new Float32Array(nor), idx:new Uint32Array(idx)};
-  }
-
-  const GEO_CUBE = makeCube();
-  const GEO_X    = makeXMesh();
-  const GEO_O    = makeTorus();
-
-  function makeVAO(geo, indexType){
-    const vao=gl.createVertexArray();
-    gl.bindVertexArray(vao);
-
-    const vboP=gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER,vboP);
-    gl.bufferData(gl.ARRAY_BUFFER, geo.pos, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-
-    const vboN=gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER,vboN);
-    gl.bufferData(gl.ARRAY_BUFFER, geo.nor, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
-
-    const ibo=gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.idx, gl.STATIC_DRAW);
-
+    const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+    const mk=(loc,arr,comp)=>{const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(arr),gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,comp,gl.FLOAT,false,0,0);};
+    mk(0,pos,3); mk(1,nor,3); mk(2,col,3); mk(3,face,1);
     gl.bindVertexArray(null);
-    return {vao, count: geo.idx.length, indexType};
+    return {vao,count:pos.length/3};
   }
 
-  const VAO_CUBE = makeVAO(GEO_CUBE, gl.UNSIGNED_SHORT);
-  const VAO_X    = makeVAO(GEO_X,    gl.UNSIGNED_INT);
-  const VAO_O    = makeVAO(GEO_O,    gl.UNSIGNED_INT);
-
-  // Instancing
-  function attachInstBuffers(vaoObj, instT, instCol, instVis){
-    gl.bindVertexArray(vaoObj.vao);
-
-    const bIT = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bIT);
-    gl.bufferData(gl.ARRAY_BUFFER, instT.byteLength, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(2);
-    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribDivisor(2, 1);
-
-    const bIC = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bIC);
-    gl.bufferData(gl.ARRAY_BUFFER, instCol.byteLength, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribDivisor(3, 1);
-
-    const bIV = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bIV);
-    gl.bufferData(gl.ARRAY_BUFFER, instVis.byteLength, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(4);
-    gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribDivisor(4, 1);
-
-    gl.bindVertexArray(null);
-    return { bIT, bIC, bIV };
-  }
-
-  function attachInstScale(vaoObj, instScale){
-    gl.bindVertexArray(vaoObj.vao);
-    const bIS = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bIS);
-    gl.bufferData(gl.ARRAY_BUFFER, instScale.byteLength, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribDivisor(6, 1);
-    gl.bindVertexArray(null);
-    return bIS;
-  }
-
-  const INST = SIZE;
-
-  const cubeT    = new Float32Array(INST*3);
-  const cubeC    = new Float32Array(INST*4);
-  const cubeV    = new Float32Array(INST);
-  const cubePick = new Float32Array(INST*3);
-  const cubeS    = new Float32Array(INST);
-
-  const xT = new Float32Array(INST*3);
-  const xC = new Float32Array(INST*4);
-  const xV = new Float32Array(INST);
-  const xS = new Float32Array(INST);
-
-  const oT = new Float32Array(INST*3);
-  const oC = new Float32Array(INST*4);
-  const oV = new Float32Array(INST);
-  const oS = new Float32Array(INST);
-
-  for(let i=0;i<INST;i++){
-    cubeS[i]=1.0;
-    xS[i]=0.0;
-    oS[i]=0.0;
-  }
-
-  const BUF_CUBE = attachInstBuffers(VAO_CUBE, cubeT, cubeC, cubeV);
-  const BUF_X    = attachInstBuffers(VAO_X,    xT,    xC,    xV);
-  const BUF_O    = attachInstBuffers(VAO_O,    oT,    oC,    oV);
-
-  const bCS = attachInstScale(VAO_CUBE, cubeS);
-  const bXS = attachInstScale(VAO_X, xS);
-  const bOS = attachInstScale(VAO_O, oS);
-
-  gl.bindVertexArray(VAO_CUBE.vao);
-  const bPick = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, bPick);
-  gl.bufferData(gl.ARRAY_BUFFER, cubePick.byteLength, gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(5);
-  gl.vertexAttribPointer(5, 3, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(5, 1);
-  gl.bindVertexArray(null);
-
-  const vaoL = gl.createVertexArray();
-  gl.bindVertexArray(vaoL);
-  const vboL = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vboL);
-  gl.bufferData(gl.ARRAY_BUFFER, 4096, gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-  gl.bindVertexArray(null);
-
-  // Picking FBO
-  let pickFbo=null, pickTex=null, pickDepth=null, pickW=0, pickH=0;
-  function ensurePickFbo(w,h){
-    if(pickTex && pickW===w && pickH===h) return;
-    pickW=w; pickH=h;
-
-    if(pickFbo){
-      gl.deleteFramebuffer(pickFbo);
-      gl.deleteTexture(pickTex);
-      gl.deleteRenderbuffer(pickDepth);
+  // ---------- cube state ----------
+  const SP=1.0;
+  let cubies=[];
+  function buildCube(){
+    cubies=[];
+    for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+      if(x===0&&y===0&&z===0) continue;
+      cubies.push({home:[x,y,z], pos:[x,y,z], orient:ID3.slice(), geo:buildCubieGeo([x,y,z])});
     }
-
-    pickFbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
-
-    pickTex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, pickTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pickTex, 0);
-
-    pickDepth = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, pickDepth);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, pickDepth);
-
-    const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    if(st !== gl.FRAMEBUFFER_COMPLETE) showError('Picking FBO non completo: ' + st);
   }
+  buildCube();
+  const isSolved=()=>cubies.every(c=>c.pos[0]===c.home[0]&&c.pos[1]===c.home[1]&&c.pos[2]===c.home[2]&&isID(c.orient));
 
-  // Camera (mobile “sensata”)
-  const IS_MOBILE = window.matchMedia('(max-width: 900px)').matches;
-  let theta=-0.7, phi=0.95, radius = IS_MOBILE ? 12.8 : 10.8;
-  let pan=[0, -0.55, 0];
-
-  function fitCameraToView(W,H){
-    if(!IS_MOBILE) return;
-    const aspect = W / Math.max(1,H);
-    const base = 12.8;
-    radius = base + (aspect < 0.62 ? 2.0 : 0.0);
-    radius = clamp(radius, 11.5, 18.0);
-  }
-
-  function getEye(){
-    const x=radius*Math.cos(theta)*Math.sin(phi);
-    const y=radius*Math.cos(phi);
-    const z=radius*Math.sin(theta)*Math.sin(phi);
-    return [x+pan[0], y+pan[1], z+pan[2]];
-  }
-  function getWorld(){
-    const rx=mat4.rotX(0.08), ry=mat4.rotY(-0.12);
-    return mat4.mul(ry,rx);
-  }
-
-  const cellSize=1.0, gap=0.22, spacingXY=cellSize+gap;
-  const half=(N-1)*spacingXY/2;
-
-  function pointOfIndex(i){
-    const {x,y,z}=toXYZ(i);
-    const px=x*spacingXY-half;
-    const py=((N-1-y)*spacingXY-half);
-    const baseZ=spacingXY*1.35*zScale*(explode?1.55:1.0);
-    const pz=((N-1)/2 - z)*baseZ;
-    return [px,py,pz];
-  }
-
-  function encodeIdToRGB(id){
-    const r=(id&255), g=((id>>8)&255), b=((id>>16)&255);
-    return [r/255,g/255,b/255];
-  }
-
-  const SYMBOL_SCALE = 0.78;
-  const SYMBOL_LIFT  = 0.12;
-
-  function syncInstances(){
-    for(let i=0;i<SIZE;i++){
-      const p = pointOfIndex(i);
-
-      cubeT[i*3+0]=p[0]; cubeT[i*3+1]=p[1]; cubeT[i*3+2]=p[2];
-
-      const z=toXYZ(i).z;
-      const layerOpacity=[1.0,0.78,0.60,0.45][z];
-      cubeC[i*4+0]=0.10; cubeC[i*4+1]=0.13; cubeC[i*4+2]=0.18; cubeC[i*4+3]=0.92*layerOpacity;
-
-      cubeV[i]=(planeZ===null || z===planeZ)?1.0:0.0;
-
-      const rgb=encodeIdToRGB(i+1);
-      cubePick[i*3+0]=rgb[0]; cubePick[i*3+1]=rgb[1]; cubePick[i*3+2]=rgb[2];
-
-      const planeOk = (planeZ===null || z===planeZ);
-      const sx=p[0], sy=p[1], sz=p[2]+SYMBOL_LIFT;
-
-      xT[i*3+0]=sx; xT[i*3+1]=sy; xT[i*3+2]=sz;
-      xC[i*4+0]=0.29; xC[i*4+1]=0.64; xC[i*4+2]=1.00; xC[i*4+3]=0.98;
-      const xOn = planeOk && board[i]==='X';
-      xV[i]=xOn?1.0:0.0;
-      xS[i]=xOn?SYMBOL_SCALE:0.0;
-
-      oT[i*3+0]=sx; oT[i*3+1]=sy; oT[i*3+2]=sz;
-      oC[i*4+0]=0.27; oC[i*4+1]=0.82; oC[i*4+2]=0.62; oC[i*4+3]=0.98;
-      const oOn = planeOk && board[i]==='O';
-      oV[i]=oOn?1.0:0.0;
-      oS[i]=oOn?SYMBOL_SCALE:0.0;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeT);
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeC);
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_CUBE.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bPick);        gl.bufferSubData(gl.ARRAY_BUFFER,0,cubePick);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bCS);          gl.bufferSubData(gl.ARRAY_BUFFER,0,cubeS);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,xT);
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,xC);
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_X.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,xV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bXS);       gl.bufferSubData(gl.ARRAY_BUFFER,0,xS);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIT); gl.bufferSubData(gl.ARRAY_BUFFER,0,oT);
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIC); gl.bufferSubData(gl.ARRAY_BUFFER,0,oC);
-    gl.bindBuffer(gl.ARRAY_BUFFER, BUF_O.bIV); gl.bufferSubData(gl.ARRAY_BUFFER,0,oV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bOS);       gl.bufferSubData(gl.ARRAY_BUFFER,0,oS);
-  }
-
-  function clearPreview(){ previewLines=[]; }
-
-  function linePotential(line, player){
-    const opp=(player==='X')?'O':'X';
-    let p=0,o=0,e=0;
-    for(const c of line){
-      if(board[c]===player) p++;
-      else if(board[c]===opp) o++;
-      else e++;
-    }
-    if(p>0 && o>0) return 0;
-    if(p===3 && e===1) return 1000;
-    if(p===2 && e===2) return 80;
-    if(p===1 && e===3) return 10;
-    if(p===0 && e===4) return 2;
-    return 1;
-  }
-
-  function setPreviewForCell(i){
-    clearPreview();
-    if(!teach || gameOver || board[i]) return;
-    let lines=LINES_THROUGH[i];
-    if(planeZ!==null) lines=lines.filter(l=>l.every(c=>toXYZ(c).z===planeZ));
-    previewLines = lines
-      .map(l=>({l, s: linePotential(l, current)}))
-      .sort((a,b)=>b.s-a.s)
-      .slice(0,10)
-      .map(o=>o.l);
-  }
-
-  function buildLineVerts(){
-    const v=[];
-    for(const l of previewLines){
-      const a=pointOfIndex(l[0]), b=pointOfIndex(l[3]);
-      v.push(...a,...b);
-    }
-    if(winLine){
-      const a=pointOfIndex(winLine[0]), b=pointOfIndex(winLine[3]);
-      v.push(...a,...b);
-    }
-    return new Float32Array(v);
-  }
+  // ---------- camera ----------
+  const IS_MOBILE=window.matchMedia('(max-width: 900px)').matches;
+  let theta=0.7, phi=1.0, radius=IS_MOBILE?7.6:6.6;
+  const getEye=()=>[radius*Math.cos(theta)*Math.sin(phi), radius*Math.cos(phi), radius*Math.sin(theta)*Math.sin(phi)];
 
   function setCanvasSize(){
-    const dpr=Math.min(2, window.devicePixelRatio||1);
-    const w=canvas.clientWidth|0, h=canvas.clientHeight|0;
-    const W=(w*dpr)|0, H=(h*dpr)|0;
-    if(canvas.width!==W || canvas.height!==H){
-      canvas.width=W; canvas.height=H;
-      gl.viewport(0,0,W,H);
-      ensurePickFbo(W,H);
-    }
-    return {W,H};
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    const w=canvas.clientWidth|0,h=canvas.clientHeight|0;
+    const W=(w*dpr)|0,H2=(h*dpr)|0;
+    if(canvas.width!==W||canvas.height!==H2){ canvas.width=W;canvas.height=H2; ensurePick(W,H2); }
+    return {W,H:H2};
   }
-
   function getVP(W,H){
-    const proj=mat4.persp(45*Math.PI/180, W/H, 0.1, 200);
-    const eye=getEye();
-    const view=mat4.lookAt(eye, [pan[0],pan[1],pan[2]], [0,1,0]);
-    return mat4.mul(proj, view);
+    const proj=mat4.persp(45*Math.PI/180, W/Math.max(1,H), 0.1, 100);
+    return mat4.mul(proj, mat4.lookAt(getEye(),[0,0,0],[0,1,0]));
   }
 
-  function drawPick(VP,Wm){
-    gl.bindFramebuffer(gl.FRAMEBUFFER,pickFbo);
-    gl.viewport(0,0,pickW,pickH);
-    gl.disable(gl.BLEND);
-    gl.enable(gl.DEPTH_TEST);
-    gl.clearColor(0,0,0,1);
-    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-
-    gl.useProgram(PPICK);
-    gl.bindVertexArray(VAO_CUBE.vao);
-    gl.uniformMatrix4fv(gl.getUniformLocation(PPICK,'uVP'),false,VP);
-    gl.uniformMatrix4fv(gl.getUniformLocation(PPICK,'uW'),false,Wm);
-    gl.drawElementsInstanced(gl.TRIANGLES, VAO_CUBE.count, VAO_CUBE.indexType, 0, INST);
-
-    gl.bindVertexArray(null);
-    gl.useProgram(null);
+  // ---------- pick FBO ----------
+  let pFbo=null,pTex=null,pDep=null,pW=0,pH=0;
+  function ensurePick(w,h){
+    if(pTex&&pW===w&&pH===h)return; pW=w;pH=h;
+    if(pFbo){gl.deleteFramebuffer(pFbo);gl.deleteTexture(pTex);gl.deleteRenderbuffer(pDep);}
+    pFbo=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,pFbo);
+    pTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,pTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pTex,0);
+    pDep=gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER,pDep);
+    gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,w,h);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,pDep);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
   }
 
-  function pickAt(px,py){
-    if(!pickFbo || pickW<=0 || pickH<=0) return null;
-    const x = clamp(px, 0, pickW - 1);
-    const y = clamp(py, 0, pickH - 1);
-    const buf = new Uint8Array(4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
-    gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    const id = buf[0] + (buf[1]<<8) + (buf[2]<<16);
-    if(!id) return null;
-    const i = id - 1;
-    if(planeZ !== null && toXYZ(i).z !== planeZ) return null;
-    return i;
+  // ---------- animation / move queue ----------
+  let anim=null;
+  const queue=[];
+  const DUR=160;
+
+  function modelOf(c, extraRot){
+    const base=mat4.fromM3T(c.orient, [c.pos[0]*SP,c.pos[1]*SP,c.pos[2]*SP]);
+    return extraRot? mat4.mul(extraRot, base) : base;
   }
-
-  function drawLit(vaoObj, VP, Wm){
-    gl.bindVertexArray(vaoObj.vao);
-    gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uVP'),false,VP);
-    gl.uniformMatrix4fv(gl.getUniformLocation(PLIT,'uW'),false,Wm);
-    gl.drawElementsInstanced(gl.TRIANGLES, vaoObj.count, vaoObj.indexType, 0, INST);
-    gl.bindVertexArray(null);
-  }
-
-  function drawMain(VP,Wm){
-    gl.viewport(0,0,canvas.width,canvas.height);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.clearColor(0,0,0,0);
-    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-
-    gl.useProgram(PLIT);
-
-    gl.enable(gl.DEPTH_TEST);
-    gl.depthMask(true);
-    drawLit(VAO_CUBE, VP, Wm);
-
-    gl.disable(gl.DEPTH_TEST);
-    gl.depthMask(false);
-    drawLit(VAO_X, VP, Wm);
-    drawLit(VAO_O, VP, Wm);
-
-    gl.depthMask(true);
-    gl.enable(gl.DEPTH_TEST);
-    gl.useProgram(null);
-
-    const lv=buildLineVerts();
-    if(lv.length){
-      gl.useProgram(PLINE);
-      gl.bindVertexArray(vaoL);
-      gl.bindBuffer(gl.ARRAY_BUFFER,vboL);
-      gl.bufferData(gl.ARRAY_BUFFER, lv, gl.DYNAMIC_DRAW);
-      gl.uniformMatrix4fv(gl.getUniformLocation(PLINE,'uVP'),false,VP);
-
-      if(previewLines.length){
-        gl.uniform4f(gl.getUniformLocation(PLINE,'uCol'), 1,1,1, 0.22);
-        gl.drawArrays(gl.LINES, 0, previewLines.length*2);
+  function commitMove(ax,layer,dir){
+    const Ri=rotInt(ax,dir);
+    for(const c of cubies){
+      if(c.pos[ax]===layer){
+        c.pos=m3vec(Ri,c.pos).map(Math.round);
+        c.orient=m3mul(Ri,c.orient);
       }
-      if(winLine){
-        gl.uniform4f(gl.getUniformLocation(PLINE,'uCol'), 1,1,1, 0.92);
-        gl.drawArrays(gl.LINES, previewLines.length*2, 2);
-      }
+    }
+  }
+  function enqueue(ax,layer,dir,record=true){ queue.push({ax,layer,dir,record}); }
+  function startNext(){
+    if(anim||queue.length===0) return;
+    const m=queue.shift();
+    anim={ax:m.ax,layer:m.layer,dir:m.dir,record:m.record,t0:performance.now(),dur:DUR};
+  }
 
-      gl.bindVertexArray(null);
-      gl.useProgram(null);
+  // ---------- history (undo/redo) ----------
+  let history=[], hIdx=0;
+  function pushHistory(ax,layer,dir){ history.length=hIdx; history.push({ax,layer,dir}); hIdx++; updateButtons(); }
+  function doMove(ax,layer,dir,record=true){ enqueue(ax,layer,dir,record); if(record) onUserMove(); }
+  function undo(){ if(anim||hIdx<=0) return; const m=history[hIdx-1]; hIdx--; enqueue(m.ax,m.layer,-m.dir,false); moveCount++; updateStats(); updateButtons(); }
+  function redo(){ if(anim||hIdx>=history.length) return; const m=history[hIdx]; hIdx++; enqueue(m.ax,m.layer,m.dir,false); moveCount++; updateStats(); updateButtons(); }
+
+  // ---------- stats / timer ----------
+  let moveCount=0, startT=0, timerRunning=false, scrambled=false;
+  const statusText=document.getElementById('statusText');
+  const solvedPill=document.getElementById('solvedPill');
+  const timeV=document.getElementById('timeV'), moveV=document.getElementById('moveV');
+  const setStatus=(t)=>statusText.textContent=t;
+  function fmt(ms){ const s=ms/1000; const m=Math.floor(s/60); const r=(s-m*60); return String(m).padStart(2,'0')+':'+r.toFixed(1).padStart(4,'0'); }
+  function updateStats(){ moveV.textContent=moveCount; }
+  function onUserMove(){ if(scrambled && !timerRunning){ timerRunning=true; startT=performance.now(); } moveCount++; updateStats(); }
+  function checkSolved(){
+    if(isSolved()){
+      solvedPill.textContent='RISOLTO ✓'; solvedPill.classList.add('win');
+      if(scrambled){ timerRunning=false; setStatus(`Risolto in ${moveCount} mosse!`); scrambled=false; }
+    } else {
+      solvedPill.textContent= scrambled?'mescolato':'—'; solvedPill.classList.remove('win');
     }
   }
 
-  // GAME / CPU
-  function empties(){
-    const e=[];
-    for(let i=0;i<SIZE;i++){
-      if(!board[i] && (planeZ===null || toXYZ(i).z===planeZ)) e.push(i);
-    }
-    return e;
-  }
-
-  function checkWinner(){
-    for(const line of WIN_LINES){
-      const a=board[line[0]];
-      if(!a) continue;
-      let ok=true;
-      for(let k=1;k<line.length;k++){ if(board[line[k]]!==a){ok=false;break;} }
-      if(ok) return {winner:a,line};
-    }
-    if(board.every(v=>v)) return {winner:'D', line:null};
-    return {winner:null,line:null};
-  }
-
-  function findImmediateWinMove(player){
-    const e=empties();
-    for(const i of e){
-      board[i]=player;
-      const r=checkWinner();
-      board[i]=null;
-      if(r.winner===player) return i;
-    }
-    return null;
-  }
-
-  function bestHeuristicMove(player){
-    const e=empties();
-    if(!e.length) return null;
-    if(cpuLevel==='easy') return e[Math.floor(Math.random()*e.length)];
-
-    const win=findImmediateWinMove(player);
-    if(win!=null) return win;
-
-    const opp=(player==='X')?'O':'X';
-    const block=findImmediateWinMove(opp);
-    if(block!=null) return block;
-
-    let best={i:e[0],score:-1e9};
-    for(const i of e){
-      let sum=0;
-      for(const line of LINES_THROUGH[i]){
-        if(planeZ!==null && !line.every(c=>toXYZ(c).z===planeZ)) continue;
-        sum += linePotential(line, player);
-      }
-      const p=toXYZ(i);
-      const centerBonus=(1.5-Math.abs(p.x-1.5))+(1.5-Math.abs(p.y-1.5))+(1.5-Math.abs(p.z-1.5));
-      sum += centerBonus*2;
-
-      if(cpuLevel==='hard'){
-        board[i]=player;
-        const oppWin=findImmediateWinMove(opp);
-        if(oppWin!=null) sum -= 500;
-        board[i]=null;
-      }
-      if(sum>best.score) best={i,score:sum};
-    }
-    return best.i;
-  }
-
-  function cpuMove(){
-    if(gameOver) return;
-    setStatus('CPU sta pensando…');
-    setTimeout(()=>{
-      const m=bestHeuristicMove('O');
-      if(m==null) return;
-      place(m,'O');
-      const r=checkWinner();
-      if(r.winner){ endGame(r); return; }
-      current='X'; updateTurn(); setStatus('Tocca a X.');
-    }, 220);
-  }
-
-  function canPlay(i){
-    if(gameOver) return false;
-    if(board[i]) return false;
-    if(planeZ!==null && toXYZ(i).z!==planeZ) return false;
-    if(vsCPU && current==='O') return false;
-    return true;
-  }
-
-  function place(i,who){
-    board[i]=who;
-    syncInstances();
-    clearPreview();
-  }
-
-  function endGame(res){
-    gameOver=true;
-    clearPreview();
-    if(res.winner==='D'){
-      setStatus('Pareggio.');
-      lineInfo.style.display='none';
-      winLine=null;
-    }else{
-      setStatus(`Vince ${res.winner}! (4 in linea)`);
-      score[res.winner]++; updateScores();
-      winLine=res.line.slice();
-      lineInfo.style.display='';
-      const p0=toXYZ(winLine[0]), p3=toXYZ(winLine[3]);
-      lineInfo.textContent = `Linea: (${p0.x},${p0.y},${p0.z}) → (${p3.x},${p3.y},${p3.z})`;
-    }
-    updateTurn();
-  }
-
-  function play(i){
-    if(!canPlay(i)) return;
-    place(i,current);
-    const r=checkWinner();
-    if(r.winner){ endGame(r); return; }
-    current=(current==='X')?'O':'X';
-    updateTurn();
-    setStatus(`Tocca a ${current}.`);
-    if(vsCPU && current==='O') cpuMove();
-  }
-
-  // INPUT (FIX iPhone: tap per piazzare X/O + blocca scroll solo durante drag)
-let dragging=false, dragMode='rotate', lastX=0,lastY=0;
-let mouseX=0, mouseY=0, mouseMoved=true;
-
-let downX=0, downY=0, movedDist=0;
-let downTime=0;
-
-function canvasToPickXY(clientX, clientY){
-  const rect=canvas.getBoundingClientRect();
-  const dpr=Math.min(2, window.devicePixelRatio||1);
-  const px=(clientX-rect.left)*dpr;
-  const py=(rect.height-(clientY-rect.top))*dpr; // Y invertita
-  return {px,py};
-}
-
-// blocca lo scroll pagina SOLO mentre trascini sul canvas
-canvas.addEventListener('touchmove', (e)=>{ if(dragging) e.preventDefault(); }, {passive:false});
-
-canvas.addEventListener('pointerdown',(e)=>{
-  dragging=true;
-  lastX=e.clientX; lastY=e.clientY;
-  downX=e.clientX; downY=e.clientY;
-  movedDist=0;
-  downTime=performance.now();
-
-  // su mobile non c'è Shift: default rotate
-  dragMode = (e.shiftKey && !IS_MOBILE) ? 'pan' : 'rotate';
-
-  canvas.setPointerCapture(e.pointerId);
-
-  // su iOS evita gesture di pagina durante touch
-  if(e.pointerType === 'touch') e.preventDefault();
-},{passive:false});
-
-function endPointer(e){
-  if(!dragging) return;
-
-  // “tap” = poco movimento + tempo breve
-  const isTap = (movedDist < 10) && ((performance.now()-downTime) < 600);
-
-  dragging=false;
-  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-
-  // su touch: piazza su pointerup (non su click)
-  if(e.pointerType === 'touch' && isTap){
-    const {px,py} = canvasToPickXY(e.clientX, e.clientY);
-    const i = pickAt(px,py);
-    if(i!=null) play(i);
-  }
-}
-canvas.addEventListener('pointerup', endPointer, {passive:false});
-canvas.addEventListener('pointercancel', ()=>{ dragging=false; }, {passive:false});
-
-canvas.addEventListener('pointermove',(e)=>{
-  const rect=canvas.getBoundingClientRect();
-  const dpr=Math.min(2, window.devicePixelRatio||1);
-
-  if(dragging){
-    const dx=e.clientX-lastX, dy=e.clientY-lastY;
-    lastX=e.clientX; lastY=e.clientY;
-
-    movedDist += Math.hypot(dx,dy);
-
-    if(dragMode==='rotate'){
-      theta -= dx*0.007;
-      phi   -= dy*0.007;
-      phi = clamp(phi, 0.15, Math.PI-0.15);
-    }else{
-      const panSpeed = radius*0.0012;
-      pan[0] += -dx*panSpeed;
-      pan[1] +=  dy*panSpeed;
-    }
-    return;
-  }
-
-  mouseX=(e.clientX-rect.left)*dpr;
-  mouseY=(rect.height-(e.clientY-rect.top))*dpr;
-  mouseMoved=true;
-});
-
-// zoom: wheel desktop
-canvas.addEventListener('wheel',(e)=>{
-  e.preventDefault();
-  const delta=Math.sign(e.deltaY);
-  radius *= (delta>0)?1.08:0.92;
-  radius = clamp(radius, 6.2, 26);
-},{passive:false});
-
-// click desktop (manteniamo click per mouse; su mobile gestiamo via pointerup)
-canvas.addEventListener('click',(e)=>{
-  if(IS_MOBILE) return;
-  const {px,py} = canvasToPickXY(e.clientX, e.clientY);
-  const i=pickAt(px,py);
-  if(i!=null) play(i);
-});
-
-// UI
-  function buildZBar(){
-    const items=[{t:'Tutti',v:null},{t:'Z0',v:0},{t:'Z1',v:1},{t:'Z2',v:2},{t:'Z3',v:3}];
-    zbar.innerHTML='';
-    for(const it of items){
-      const b=document.createElement('button');
-      b.className='zbtn';
-      b.textContent=it.t;
-      b.onclick=()=>{
-        planeZ=it.v;
-        syncZBar();
-        syncInstances();
-        clearPreview();
-      };
-      zbar.appendChild(b);
-    }
-    syncZBar();
-  }
-  function syncZBar(){
-    [...zbar.querySelectorAll('.zbtn')].forEach(b=>b.classList.remove('active'));
-    [...zbar.querySelectorAll('.zbtn')].forEach(b=>{
-      const t=b.textContent;
-      const v=(t==='Tutti')?null:Number(t.slice(1));
-      if((v===null && planeZ===null) || v===planeZ) b.classList.add('active');
-    });
-  }
-
-  resetBtn.onclick = ()=>newGame();
-  resetScoreBtn.onclick = ()=>{ score={X:0,O:0}; updateScores(); newGame(); };
-
-  explodeSwitch.onclick = ()=>{
-    explode = toggleSwitch(explodeSwitch);
-    explodeBadge.textContent = explode?'ON':'OFF';
-    syncInstances();
-  };
-
-  zDepth.oninput = ()=>{
-    zScale = Number(zDepth.value);
-    syncInstances();
-  };
-
-  cpuSwitch.onclick = ()=>{
-    vsCPU = toggleSwitch(cpuSwitch);
-    cpuBadge.textContent = vsCPU?'ON':'OFF';
-    if(vsCPU && current==='O' && !gameOver) cpuMove();
-  };
-  cpuLevelSel.onchange = ()=> cpuLevel = cpuLevelSel.value;
-
-  teachSwitch.onclick = ()=>{
-    teach = toggleSwitch(teachSwitch);
-    teachBadge.textContent = teach?'ON':'OFF';
-    if(!teach) clearPreview();
-  };
-
-  function newGame(){
-    board=Array(SIZE).fill(null);
-    current='X';
-    gameOver=false;
-    hoveredIndex=null;
-    previewLines=[];
-    winLine=null;
-    lineInfo.style.display='none';
-    syncInstances();
-    setStatus('Tocca a X.');
-    updateTurn();
-  }
-
-  function tick(){
+  // ---------- render ----------
+  function draw(){
     const {W,H}=setCanvasSize();
-    fitCameraToView(W,H);
     const VP=getVP(W,H);
-    const Wm=getWorld();
 
-    drawPick(VP,Wm);
-
-    if(mouseMoved){
-      hoveredIndex = pickAt(mouseX, mouseY);
-      if(teach && hoveredIndex!=null && canPlay(hoveredIndex)) setPreviewForCell(hoveredIndex);
-      else clearPreview();
-      mouseMoved=false;
+    let animAx=-1, animLayer=0, animAngle=0;
+    if(anim){
+      const t=clamp((performance.now()-anim.t0)/anim.dur,0,1);
+      const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+      animAngle=anim.dir*(Math.PI/2)*e; animAx=anim.ax; animLayer=anim.layer;
+      if(t>=1){
+        commitMove(anim.ax,anim.layer,anim.dir);
+        if(anim.record) pushHistory(anim.ax,anim.layer,anim.dir);
+        anim=null; checkSolved();
+      }
     }
 
-    drawMain(VP,Wm);
-    requestAnimationFrame(tick);
+    // pick pass
+    gl.bindFramebuffer(gl.FRAMEBUFFER,pFbo);
+    gl.viewport(0,0,pW,pH);
+    gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+    gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(PPICK); gl.uniformMatrix4fv(uPickVP,false,VP);
+    for(let i=0;i<cubies.length;i++){
+      const c=cubies[i];
+      const extra=(animAx>=0&&c.pos[animAx]===animLayer)?mat4.rotAxis(animAx,animAngle):null;
+      gl.uniformMatrix4fv(uPickM,false,modelOf(c,extra));
+      gl.uniform1f(uPickB, i*6+1);
+      gl.bindVertexArray(c.geo.vao);
+      gl.drawArrays(gl.TRIANGLES,0,c.geo.count);
+    }
+
+    // main pass
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.viewport(0,0,canvas.width,canvas.height);
+    gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(PLIT); gl.uniformMatrix4fv(uLitVP,false,VP);
+    for(const c of cubies){
+      const extra=(animAx>=0&&c.pos[animAx]===animLayer)?mat4.rotAxis(animAx,animAngle):null;
+      gl.uniformMatrix4fv(uLitM,false,modelOf(c,extra));
+      gl.bindVertexArray(c.geo.vao);
+      gl.drawArrays(gl.TRIANGLES,0,c.geo.count);
+    }
+    gl.bindVertexArray(null);
+
+    startNext();
+    if(timerRunning) timeV.textContent=fmt(performance.now()-startT);
+    requestAnimationFrame(draw);
   }
 
-  // INIT
-  buildZBar();
-  updateScores();
-  toggleSwitch(explodeSwitch,false); explodeBadge.textContent='OFF';
-  toggleSwitch(cpuSwitch,false); cpuBadge.textContent='OFF';
-  toggleSwitch(teachSwitch,true); teachBadge.textContent='ON';
+  function pickAt(cx,cy){
+    if(!pFbo)return null;
+    const rect=canvas.getBoundingClientRect();
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    const px=clamp(Math.round((cx-rect.left)*dpr),0,pW-1);
+    const py=clamp(Math.round((rect.height-(cy-rect.top))*dpr),0,pH-1);
+    const buf=new Uint8Array(4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,pFbo);
+    gl.readPixels(px,py,1,1,gl.RGBA,gl.UNSIGNED_BYTE,buf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    const code=buf[0]+(buf[1]<<8)+(buf[2]<<16);
+    if(!code)return null;
+    const id=code-1; return {cubie:Math.floor(id/6), face:id%6};
+  }
 
-  syncInstances();
-  newGame();
-  tick();
+  // ---------- input ----------
+  const pointers=new Map();
+  let mode=null;
+  let lastX=0,lastY=0, downX=0,downY=0;
+  let grab=null, turnDone=false, pinchDist=0;
+
+  function grabInfo(p){
+    const c=cubies[p.cubie]; const F=FACES[p.face];
+    const wn=m3vec(c.orient, F.nor);
+    const wp=[c.pos[0]*SP+wn[0]*H, c.pos[1]*SP+wn[1]*H, c.pos[2]*SP+wn[2]*H];
+    return {worldNormal:wn, worldPos:wp};
+  }
+  function project(VP, p){
+    const x=VP[0]*p[0]+VP[4]*p[1]+VP[8]*p[2]+VP[12];
+    const y=VP[1]*p[0]+VP[5]*p[1]+VP[9]*p[2]+VP[13];
+    const w=VP[3]*p[0]+VP[7]*p[1]+VP[11]*p[2]+VP[15];
+    const rect=canvas.getBoundingClientRect();
+    return [ (x/w*0.5+0.5)*rect.width, (1-(y/w*0.5+0.5))*rect.height ];
+  }
+  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const absMaxAxis=(v)=>{const a=[Math.abs(v[0]),Math.abs(v[1]),Math.abs(v[2])]; return a.indexOf(Math.max(a[0],a[1],a[2]));};
+
+  function resolveTurn(dx,dy){
+    if(!grab) return;
+    const {W,H:HH}=setCanvasSize(); const VP=getVP(W,HH);
+    const n=grab.worldNormal; const nAx=absMaxAxis(n);
+    const inPlane=[0,1,2].filter(a=>a!==nAx);
+    const base=project(VP, grab.worldPos);
+    let best=null;
+    for(const a of inPlane){
+      const ahead=grab.worldPos.slice(); ahead[a]+=0.5;
+      const sp=project(VP,ahead);
+      let sd=[sp[0]-base[0], sp[1]-base[1]]; const L=Math.hypot(sd[0],sd[1])||1; sd=[sd[0]/L,sd[1]/L];
+      const proj=dx*sd[0]+dy*sd[1];
+      if(!best||Math.abs(proj)>Math.abs(best.proj)) best={axis:a,sign:Math.sign(proj)||1,proj};
+    }
+    if(!best) return;
+    const t=[0,0,0]; t[best.axis]=best.sign;
+    const rVec=cross(n,t);
+    const rAxis=absMaxAxis(rVec);
+    const dir=Math.sign(rVec[rAxis])||1;
+    const layer=cubies[grab.cubie].pos[rAxis];
+    doMove(rAxis,layer,dir,true);
+  }
+
+  canvas.addEventListener('pointerdown',(e)=>{
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===2){ mode='pinch'; const ps=[...pointers.values()];
+      pinchDist=Math.hypot(ps[0].x-ps[1].x, ps[0].y-ps[1].y); grab=null; return; }
+    lastX=downX=e.clientX; lastY=downY=e.clientY; turnDone=false;
+    const hit=(e.shiftKey)?null:pickAt(e.clientX,e.clientY);
+    if(hit){ grab=Object.assign({},hit,grabInfo(hit)); mode='turn'; }
+    else { grab=null; mode='orbit'; }
+  });
+  canvas.addEventListener('pointermove',(e)=>{
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(mode==='pinch' && pointers.size>=2){
+      const ps=[...pointers.values()]; const d=Math.hypot(ps[0].x-ps[1].x, ps[0].y-ps[1].y);
+      if(pinchDist){ radius=clamp(radius*(pinchDist/d),4.2,16); } pinchDist=d; return;
+    }
+    const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    if(mode==='orbit'){ theta-=dx*0.008; phi=clamp(phi-dy*0.008,0.15,Math.PI-0.15); }
+    else if(mode==='turn' && !turnDone){
+      const tot=Math.hypot(e.clientX-downX, e.clientY-downY);
+      if(tot>10){ turnDone=true; resolveTurn(e.clientX-downX, e.clientY-downY); }
+    }
+  });
+  function upPointer(e){
+    pointers.delete(e.pointerId);
+    try{canvas.releasePointerCapture(e.pointerId);}catch(_){}
+    if(pointers.size===0){ mode=null; grab=null; }
+    else if(pointers.size===1){ mode='orbit'; const p=[...pointers.values()][0]; lastX=p.x; lastY=p.y; }
+  }
+  canvas.addEventListener('pointerup',upPointer);
+  canvas.addEventListener('pointercancel',upPointer);
+  canvas.addEventListener('wheel',(e)=>{ e.preventDefault(); radius=clamp(radius*(e.deltaY>0?1.08:0.92),4.2,16); },{passive:false});
+
+  const KEYMAP={ 'r':[0,1,-1],'l':[0,-1,1],'u':[1,1,-1],'d':[1,-1,1],'f':[2,1,-1],'b':[2,-1,1] };
+  window.addEventListener('keydown',(e)=>{
+    const k=e.key.toLowerCase(); if(!(k in KEYMAP))return;
+    const a=KEYMAP[k]; doMove(a[0],a[1], e.shiftKey?-a[2]:a[2], true);
+  });
+
+  // ---------- UI ----------
+  const moveGrid=document.getElementById('moveGrid');
+  const MOVES=[['U',1,1,-1],['R',0,1,-1],['F',2,1,-1],['D',1,-1,1],['L',0,-1,1],['B',2,-1,1]];
+  function addMoveBtn(label,ax,layer,dir,inv){
+    const b=document.createElement('button'); b.className='mv';
+    b.innerHTML=label+(inv?'<span class="inv">’</span>':'');
+    b.onclick=()=>doMove(ax,layer,inv?-dir:dir,true);
+    moveGrid.appendChild(b);
+  }
+  for(const m of MOVES) addMoveBtn(m[0],m[1],m[2],m[3],false);
+  for(const m of MOVES) addMoveBtn(m[0],m[1],m[2],m[3],true);
+
+  const legend=document.getElementById('legend');
+  for(let fi=0;fi<6;fi++){
+    const c=FACE_COL[fi]; const el=document.createElement('div'); el.className='lg';
+    const sw=document.createElement('span'); sw.className='sw';
+    sw.style.background=`rgb(${c.map(v=>Math.round(v*255)).join(',')})`;
+    el.appendChild(sw); el.appendChild(document.createTextNode(FACE_NAME[fi]));
+    legend.appendChild(el);
+  }
+
+  const undoBtn=document.getElementById('undoBtn'), redoBtn=document.getElementById('redoBtn');
+  function updateButtons(){ undoBtn.disabled=(hIdx<=0); redoBtn.disabled=(hIdx>=history.length); }
+
+  function resetCube(announce){
+    for(const c of cubies){ c.pos=c.home.slice(); c.orient=ID3.slice(); }
+    queue.length=0; anim=null; history=[]; hIdx=0; updateButtons();
+    moveCount=0; updateStats(); timerRunning=false; startT=0; timeV.textContent='00:00.0';
+    scrambled=false; if(announce) setStatus('Cubo risolto (reset).'); checkSolved();
+  }
+  document.getElementById('scrambleBtn').onclick=()=>{
+    resetCube(false);
+    let last=-1;
+    for(let i=0;i<25;i++){
+      let ax; do{ ax=Math.floor(Math.random()*3); }while(ax===last); last=ax;
+      commitMove(ax, Math.random()<0.5?1:-1, Math.random()<0.5?1:-1);
+    }
+    history=[]; hIdx=0; updateButtons();
+    moveCount=0; updateStats(); timerRunning=false; startT=0; timeV.textContent='00:00.0';
+    scrambled=true; setStatus('Mescolato! Risolvilo.'); checkSolved();
+  };
+  document.getElementById('solveBtn').onclick=()=>resetCube(true);
+  undoBtn.onclick=undo; redoBtn.onclick=redo;
+
+  // ---------- init ----------
+  gl.enable(gl.DEPTH_TEST);
+  updateButtons(); updateStats(); checkSolved();
+  requestAnimationFrame(draw);
 })();
 </script>
 </body>
