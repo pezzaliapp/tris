@@ -475,6 +475,7 @@
 
   // ===== pick fbo =====
   let pFbo=null,pTex=null,pDep=null,pW=0,pH=0;
+  let gAx=-1,gLayer=0,gAng=0;   // stato di rotazione corrente (aggiornato in draw) per il picking on-demand
   function ensurePick(w,h){
     if(pTex&&pW===w&&pH===h)return; pW=w;pH=h;
     if(pFbo){gl.deleteFramebuffer(pFbo);gl.deleteTexture(pTex);gl.deleteRenderbuffer(pDep);}
@@ -544,17 +545,11 @@
       aAng=anim.from+(anim.to-anim.from)*e; aAx=anim.ax; aLayer=anim.layer;
       if(t>=1){ if(anim.commit){ commitMove(anim.ax,anim.layer,anim.dir); if(anim.record)pushHistory(anim.ax,anim.layer,anim.dir); } anim=null; checkSolved(); }
     } else if(live){ aAx=live.rAxis; aLayer=live.layer; aAng=live.angle; }
+    gAx=aAx; gLayer=aLayer; gAng=aAng;          // ricorda lo stato per il picking on-demand (vedi renderPick)
     const extraOf=(c)=>(aAx>=0&&c.pos[aAx]===aLayer)?mat4.rotAxis(aAx,aAng):null;
 
-    // pick (body only)
-    gl.bindFramebuffer(gl.FRAMEBUFFER,pFbo); gl.viewport(0,0,pW,pH);
-    gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.clearColor(0,0,0,1);
-    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    gl.useProgram(PPICK); gl.uniformMatrix4fv(uPickVP,false,VP);
-    for(let i=0;i<cubies.length;i++){const c=cubies[i];
-      gl.uniformMatrix4fv(uPickM,false,modelOf(c,extraOf(c))); gl.uniform1f(uPickB,i*6+1);
-      gl.bindVertexArray(c.geo.bvao); gl.drawArrays(gl.TRIANGLES,0,c.geo.bcount);}
-
+    // FLUIDITÀ: il picking NON viene più renderizzato a ogni frame (raddoppiava i draw call e
+    // faceva cadere gli fps su mobile → drag a scatti). Ora si disegna solo quando serve, in pickAt().
     // main
     gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,canvas.width,canvas.height);
     gl.enable(gl.DEPTH_TEST); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
@@ -572,10 +567,23 @@
     if(timerRunning) timeV.textContent=fmt(performance.now()-startT);
     requestAnimationFrame(draw);
   }
+  // Disegna la passata di picking nel framebuffer pFbo usando lo stato di rotazione corrente (g*).
+  // Chiamata solo al bisogno (pointerdown), non a ogni frame → niente doppia renderizzazione.
+  function renderPick(VP){
+    const extra=(c)=>(gAx>=0&&c.pos[gAx]===gLayer)?mat4.rotAxis(gAx,gAng):null;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,pFbo); gl.viewport(0,0,pW,pH);
+    gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(PPICK); gl.uniformMatrix4fv(uPickVP,false,VP);
+    for(let i=0;i<cubies.length;i++){const c=cubies[i];
+      gl.uniformMatrix4fv(uPickM,false,modelOf(c,extra(c))); gl.uniform1f(uPickB,i*6+1);
+      gl.bindVertexArray(c.geo.bvao); gl.drawArrays(gl.TRIANGLES,0,c.geo.bcount);}
+  }
   function pickAt(cx,cy){
-    if(!pFbo)return null; const rect=canvas.getBoundingClientRect(); const dpr=Math.min(2,window.devicePixelRatio||1);
+    const {W,H:Hh}=setCanvasSize(); if(!pFbo)return null; renderPick(getVP(W,Hh));
+    const rect=canvas.getBoundingClientRect(); const dpr=Math.min(2,window.devicePixelRatio||1);
     const px=clamp(Math.round((cx-rect.left)*dpr),0,pW-1), py=clamp(Math.round((rect.height-(cy-rect.top))*dpr),0,pH-1);
-    const buf=new Uint8Array(4); gl.bindFramebuffer(gl.FRAMEBUFFER,pFbo);
+    const buf=new Uint8Array(4);
     gl.readPixels(px,py,1,1,gl.RGBA,gl.UNSIGNED_BYTE,buf); gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     const code=buf[0]+(buf[1]<<8)+(buf[2]<<16); if(!code)return null;
     const id=code-1; return {cubie:Math.floor(id/6),face:id%6};

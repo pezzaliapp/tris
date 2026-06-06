@@ -55,6 +55,19 @@ soli orientamenti ruotati (proprietà del vero superflip).
       Lo stato intero si committa SOLO a 90° (in `draw()`), history/contamosse coerenti. Pulsanti
       U/D/L/R/F/B e tastiera restano a scatto (animazione `anim` from→to). Non testato col mouse
       dall'AI: serve verifica interattiva manuale.
+- [x] **Fluidità del drag (no scatti)**: FATTO (2026-06-06). Causa principale: la scena veniva
+      renderizzata DUE volte a ogni frame — passata di picking a piena risoluzione su `pFbo` +
+      passata a schermo — anche da fermi. Su GPU mobili questo dimezzava gli fps → drag a scatti.
+      Fix: la passata di picking NON gira più in `draw()`; ora si disegna SOLO al bisogno in
+      `pickAt()` tramite la nuova `renderPick(VP)`, usando lo stato di rotazione corrente memorizzato
+      in `gAx/gLayer/gAng` (aggiornati in `draw`). Il loop di rendering ora fa una sola passata/frame.
+      Confermato: tracking 1:1 (angolo live ricalcolato dalla posizione assoluta del dito a ogni
+      `pointermove`), `requestAnimationFrame` continuo, nessuna animazione `anim` in conflitto col
+      `live`. Tuning (in index.html): `DUR=160` (durata scatto pulsanti/tastiera ms), `HALF=π/2`,
+      `TURN_LIM=HALF*1.06` (clamp angolo live), `FLICK_PXS=620` (soglia flick px/s), durata snap al
+      rilascio = `clamp(delta/vel*1000, 90, 340)` ms, soglia completamento = 45° (`HALF/2`),
+      deadzone avvio drag = 6px (in `pointermove`), `pxPerRad` calcolato esatto in `beginLiveTurn`.
+      Non testato col mouse/touch dall'AI: serve verifica interattiva manuale del feel.
 - [ ] **PWA**: aggiungere `manifest.webmanifest`, `service-worker.js` (cache offline) e icone
       generate da noi. NB: questo introduce più file oltre a index.html: ammesso, ma niente
       librerie. Bump versione e cache a ogni release.
