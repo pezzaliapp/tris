@@ -40,8 +40,21 @@ soli orientamenti ruotati (proprietà del vero superflip).
       1 2 3 / 4 5 6 / 7 8 9 vista frontalmente; (2) modalità "Numero" renderizzata in browser
       (screenshot da due angoli opposti): U/F/R e L/D/B con cifre dritte e ordinate uguali.
       "Immagine" usa lo stesso percorso UV → si ricompone correttamente. Nessuna modifica al codice necessaria.
-- [ ] **Segno del drag**: in ogni angolo di vista, trascinando una faccia lo strato deve girare
-      nel verso atteso. Correggere eventuali inversioni di segno in `resolveTurn`.
+- [x] **Segno del drag**: VERIFICATO (2026-06-06) — nessuna inversione in alcun angolo di vista.
+      Analisi: tutto è calcolato in spazio-MONDO con la normale REALE della faccia toccata (il picking
+      la codifica in `vFace`, `code=uBase+vFace`), quindi è invariante rispetto all'orbita camera.
+      Tangente t = asse in-piano che meglio segue il dito a schermo; asse di rotazione ω = n×t; la
+      velocità di superficie v = ω×r = t·(n·r) − n·(t·r) ha componente lungo +t perché n·r = 1+H > 0
+      su ogni faccia esterna afferrabile ⇒ la superficie segue sempre il dito. `dir=sign(ω[rAxis])`,
+      l'animazione (`mat4.rotAxis`) e il commit intero (`rotInt`) usano la stessa famiglia rotX/Y/Z ⇒
+      segno sempre coerente. Logica spostata in `beginLiveTurn` (vecchio `resolveTurn` rimosso).
+- [x] **Rotazione proporzionale al drag (inerzia)**: FATTO (2026-06-06). Lo strato segue il dito 1:1
+      mentre trascini (stato `live`, conversione esatta px→radianti via `pxPerRad`, prospettiva inclusa).
+      Al rilascio (`releaseLiveTurn`): se >45° o flick veloce → snap a ±90° nel verso del moto con durata
+      proporzionale alla velocità del dito (veloce=secco, lento=morbido); altrimenti torna a 0 (annulla).
+      Lo stato intero si committa SOLO a 90° (in `draw()`), history/contamosse coerenti. Pulsanti
+      U/D/L/R/F/B e tastiera restano a scatto (animazione `anim` from→to). Non testato col mouse
+      dall'AI: serve verifica interattiva manuale.
 - [ ] **PWA**: aggiungere `manifest.webmanifest`, `service-worker.js` (cache offline) e icone
       generate da noi. NB: questo introduce più file oltre a index.html: ammesso, ma niente
       librerie. Bump versione e cache a ogni release.

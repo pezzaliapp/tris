@@ -491,13 +491,17 @@
   }
 
   // ===== animation / moves =====
-  let anim=null; const queue=[]; const DUR=160;
+  // anim: animazione "a scatto" (pulsanti/tastiera/snap del drag). Forma unificata:
+  //   {ax,layer, from,to (rad), dir, record, commit, t0, dur}. Si interpola from→to; a fine
+  //   corsa, SOLO se commit, si applica la mossa intera (commitMove) → stato sempre coerente.
+  // live: rotazione continua mentre il dito trascina (nessun commit finché non si rilascia).
+  let anim=null,live=null; const queue=[]; const DUR=160, HALF=Math.PI/2, TURN_LIM=HALF*1.06, FLICK_PXS=620;
   const modelOf=(c,extra)=>{const base=mat4.fromM3T(c.orient,[c.pos[0],c.pos[1],c.pos[2]]);return extra?mat4.mul(extra,base):base;};
   function commitMove(ax,layer,dir){const Ri=rotInt(ax,dir);
     for(const c of cubies) if(c.pos[ax]===layer){c.pos=m3vec(Ri,c.pos).map(Math.round);c.orient=m3mul(Ri,c.orient);}}
   const enqueue=(ax,layer,dir,record=true)=>queue.push({ax,layer,dir,record});
-  function startNext(){ if(anim||!queue.length)return; const m=queue.shift();
-    anim={ax:m.ax,layer:m.layer,dir:m.dir,record:m.record,t0:performance.now(),dur:DUR}; }
+  function startNext(){ if(anim||live||!queue.length)return; const m=queue.shift();
+    anim={ax:m.ax,layer:m.layer,from:0,to:m.dir*HALF,dir:m.dir,record:m.record,commit:true,t0:performance.now(),dur:DUR}; }
 
   // ===== history =====
   let history=[],hIdx=0;
@@ -537,9 +541,9 @@
     if(anim){
       const t=clamp((performance.now()-anim.t0)/anim.dur,0,1);
       const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
-      aAng=anim.dir*(Math.PI/2)*e; aAx=anim.ax; aLayer=anim.layer;
-      if(t>=1){ commitMove(anim.ax,anim.layer,anim.dir); if(anim.record)pushHistory(anim.ax,anim.layer,anim.dir); anim=null; checkSolved(); }
-    }
+      aAng=anim.from+(anim.to-anim.from)*e; aAx=anim.ax; aLayer=anim.layer;
+      if(t>=1){ if(anim.commit){ commitMove(anim.ax,anim.layer,anim.dir); if(anim.record)pushHistory(anim.ax,anim.layer,anim.dir); } anim=null; checkSolved(); }
+    } else if(live){ aAx=live.rAxis; aLayer=live.layer; aAng=live.angle; }
     const extraOf=(c)=>(aAx>=0&&c.pos[aAx]===aLayer)?mat4.rotAxis(aAx,aAng):null;
 
     // pick (body only)
@@ -578,36 +582,83 @@
   }
 
   // ===== input =====
-  const pointers=new Map(); let mode=null,lastX=0,lastY=0,downX=0,downY=0,grab=null,turnDone=false,pinchDist=0;
+  const pointers=new Map(); let mode=null,lastX=0,lastY=0,downX=0,downY=0,grab=null,pinchDist=0,velX=0,velY=0,tPrev=0;
   const grabInfo=(p)=>{const c=cubies[p.cubie],F=FACES[p.face]; const wn=m3vec(c.orient,F.nor);
     return {worldNormal:wn,worldPos:[c.pos[0]+wn[0]*H,c.pos[1]+wn[1]*H,c.pos[2]+wn[2]*H]};};
   function project(VP,p){const x=VP[0]*p[0]+VP[4]*p[1]+VP[8]*p[2]+VP[12],y=VP[1]*p[0]+VP[5]*p[1]+VP[9]*p[2]+VP[13],w=VP[3]*p[0]+VP[7]*p[1]+VP[11]*p[2]+VP[15];
     const rect=canvas.getBoundingClientRect(); return [(x/w*0.5+0.5)*rect.width,(1-(y/w*0.5+0.5))*rect.height];}
   const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
   const absMax=(v)=>{const a=[Math.abs(v[0]),Math.abs(v[1]),Math.abs(v[2])];return a.indexOf(Math.max(a[0],a[1],a[2]));};
-  function resolveTurn(dx,dy){
-    if(!grab)return; const {W,H:HH}=setCanvasSize(); const VP=getVP(W,HH);
-    const n=grab.worldNormal,nAx=absMax(n); const inPlane=[0,1,2].filter(a=>a!==nAx);
-    const base=project(VP,grab.worldPos); let best=null;
+  // Ruota un punto-mondo attorno a un asse coordinato con la STESSA convenzione di mat4.rotX/Y/Z
+  // (trasformazione M*v): così anteprima live, snap e commit intero non possono mai discordare sul segno.
+  function rotPt(p,ax,A){const c=Math.cos(A),s=Math.sin(A),x=p[0],y=p[1],z=p[2];
+    if(ax===0)return[x,c*y-s*z,s*y+c*z];
+    if(ax===1)return[c*x+s*z,y,-s*x+c*z];
+    return[c*x-s*y,s*x+c*y,z];}
+
+  // OBIETTIVO 1 — SEGNO DEL DRAG (analisi). Tutto è calcolato in spazio-MONDO con la normale reale
+  // della faccia toccata (il picking la codifica in vFace), quindi è INVARIANTE rispetto all'orbita
+  // della camera: niente inversioni in nessun angolo di vista. Procedimento:
+  //   • scelgo come tangente t l'asse in-piano la cui proiezione a schermo segue meglio il dito;
+  //   • asse di rotazione  ω = n × t.  La velocità di superficie è v = ω × r e, sviluppando,
+  //     v = t·(n·r) − n·(t·r); su OGNI faccia esterna afferrabile n·r = 1 + H > 0, quindi la
+  //     componente in-piano di v è lungo +t ⇒ la superficie segue SEMPRE il dito (verso corretto).
+  //   • dir = sign(ω[rAxis]) e l'animazione usano la stessa famiglia rotX/Y/Z ⇒ segno coerente.
+  // Conclusione: il segno era già corretto; qui lo riuso per la rotazione continua (obiettivo 2).
+  // Blocca l'asse/strato dal primo trascinamento e prepara la conversione dito→angolo. Ritorna live|null.
+  function beginLiveTurn(dx,dy){
+    if(anim||!grab)return null;
+    const {W,H:HH}=setCanvasSize(); const VP=getVP(W,HH);
+    const n=grab.worldNormal,nAx=absMax(n),inPlane=[0,1,2].filter(a=>a!==nAx);
+    const base=project(VP,grab.worldPos); let best=null,bestSd=null;
     for(const a of inPlane){ const ahead=grab.worldPos.slice(); ahead[a]+=0.5; const sp=project(VP,ahead);
       let sd=[sp[0]-base[0],sp[1]-base[1]]; const L=Math.hypot(sd[0],sd[1])||1; sd=[sd[0]/L,sd[1]/L];
-      const proj=dx*sd[0]+dy*sd[1]; if(!best||Math.abs(proj)>Math.abs(best.proj))best={axis:a,sign:Math.sign(proj)||1,proj};}
-    if(!best)return; const t=[0,0,0];t[best.axis]=best.sign; const rVec=cross(n,t);
-    const rAxis=absMax(rVec),dir=Math.sign(rVec[rAxis])||1,layer=cubies[grab.cubie].pos[rAxis];
-    doMove(rAxis,layer,dir,true);
+      const proj=dx*sd[0]+dy*sd[1]; if(!best||Math.abs(proj)>Math.abs(best.proj)){best={axis:a,sign:Math.sign(proj)||1,proj};bestSd=sd;} }
+    if(!best)return null;
+    const sgn=best.sign, t=[0,0,0]; t[best.axis]=sgn;
+    const rVec=cross(n,t), rAxis=absMax(rVec), dirPos=Math.sign(rVec[rAxis])||1, layer=cubies[grab.cubie].pos[rAxis];
+    const sdActive=[bestSd[0]*sgn,bestSd[1]*sgn];               // direzione schermo (unit) del verso +t del dito
+    // px di spostamento a schermo del punto afferrato per radiante di rotazione +dirPos (esatto, prospettiva inclusa) → feel 1:1
+    const eps=0.06, pr=rotPt(grab.worldPos,rAxis,dirPos*eps), sp2=project(VP,pr);
+    let ppr=((sp2[0]-base[0])*sdActive[0]+(sp2[1]-base[1])*sdActive[1])/eps;
+    if(!(ppr>8))ppr=Math.max(8,Math.abs(ppr))||120;            // floor per casi degeneri (asse di taglio quasi di taglio)
+    return {rAxis,layer,dirPos,sdActive,pxPerRad:ppr,angle:0};
+  }
+  // OBIETTIVO 2 — rilascio del drag: oltre 45° OPPURE flick veloce ⇒ completa a ±90° nel verso del moto
+  // con snap proporzionale alla velocità del dito; altrimenti torna a 0 (annulla). Lo stato intero si
+  // committa SOLO al termine dello snap a 90° (in draw()), mantenendo coerenti history e contamosse.
+  function releaseLiveTurn(){
+    const L=live; live=null;
+    const velAct=velX*L.sdActive[0]+velY*L.sdActive[1];         // px/s del dito lungo +t
+    const angVel=L.dirPos*velAct/L.pxPerRad;                    // rad/s attorno a rAxis (segno = verso dell'angolo)
+    const past=Math.abs(L.angle)>HALF/2, fast=Math.abs(velAct)>FLICK_PXS;
+    let target=0;
+    if(past)target=Math.sign(L.angle)*HALF;                    // oltre 45°: completa nel verso accumulato
+    else if(fast)target=Math.sign(angVel||L.angle||1)*HALF;    // flick veloce sotto 45°: completa nel verso del moto
+    if(target===0&&Math.abs(L.angle)<1e-3)return;              // tocco senza rotazione: nessuna animazione
+    const delta=Math.abs(target-L.angle), sp=Math.abs(angVel);
+    const dur=sp>0.0015?clamp(delta/sp*1000,90,340):240;       // dito veloce = snap veloce, lento = morbido
+    anim={ax:L.rAxis,layer:L.layer,from:L.angle,to:target,dir:Math.sign(target),record:target!==0,commit:target!==0,t0:performance.now(),dur};
+    if(target!==0)onUserMove();                                // conta mossa/timer/suono solo se si committa
   }
   canvas.addEventListener('pointerdown',(e)=>{ canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pointers.size===2){mode='pinch';const ps=[...pointers.values()];pinchDist=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);grab=null;return;}
-    lastX=downX=e.clientX;lastY=downY=e.clientY;turnDone=false;
+    if(pointers.size===2){if(live)releaseLiveTurn();mode='pinch';const ps=[...pointers.values()];pinchDist=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);grab=null;return;}
+    lastX=downX=e.clientX;lastY=downY=e.clientY;tPrev=performance.now();velX=velY=0;
     const hit=(e.shiftKey)?null:pickAt(e.clientX,e.clientY);
-    if(hit){grab=Object.assign({},hit,grabInfo(hit));mode='turn';} else {grab=null;mode='orbit';}});
+    if(hit){grab=Object.assign({},hit,grabInfo(hit));mode='turn';live=null;} else {grab=null;mode='orbit';}});
   canvas.addEventListener('pointermove',(e)=>{ if(!pointers.has(e.pointerId))return; pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(mode==='pinch'&&pointers.size>=2){const ps=[...pointers.values()];const d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);if(pinchDist)radius=clamp(radius*(pinchDist/d),4.2,16);pinchDist=d;return;}
+    const now=performance.now(),dt=now-tPrev; if(dt>0){velX=(e.clientX-lastX)/dt*1000;velY=(e.clientY-lastY)/dt*1000;tPrev=now;}
     const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
     if(mode==='orbit'){theta-=dx*0.008;phi=clamp(phi-dy*0.008,0.15,Math.PI-0.15);}
-    else if(mode==='turn'&&!turnDone){const tot=Math.hypot(e.clientX-downX,e.clientY-downY);if(tot>10){turnDone=true;resolveTurn(e.clientX-downX,e.clientY-downY);}}});
-  function upPointer(e){ pointers.delete(e.pointerId); try{canvas.releasePointerCapture(e.pointerId);}catch(_){}
-    if(pointers.size===0){mode=null;grab=null;} else if(pointers.size===1){mode='orbit';const p=[...pointers.values()][0];lastX=p.x;lastY=p.y;}}
+    else if(mode==='turn'){
+      if(!live){ if(Math.hypot(e.clientX-downX,e.clientY-downY)>6) live=beginLiveTurn(e.clientX-downX,e.clientY-downY); }
+      if(live){ const fp=(e.clientX-downX)*live.sdActive[0]+(e.clientY-downY)*live.sdActive[1];   // dito proiettato sul verso +t
+        live.angle=clamp(live.dirPos*fp/live.pxPerRad,-TURN_LIM,TURN_LIM); }                       // angolo 1:1 (about rAxis)
+    }});
+  function upPointer(e){ if(mode==='turn'&&live)releaseLiveTurn();
+    pointers.delete(e.pointerId); try{canvas.releasePointerCapture(e.pointerId);}catch(_){}
+    if(pointers.size===0){mode=null;grab=null;} else if(pointers.size===1){mode='orbit';const p=[...pointers.values()][0];lastX=p.x;lastY=p.y;tPrev=performance.now();velX=velY=0;}}
   canvas.addEventListener('pointerup',upPointer); canvas.addEventListener('pointercancel',upPointer);
   canvas.addEventListener('wheel',(e)=>{e.preventDefault();radius=clamp(radius*(e.deltaY>0?1.08:0.92),4.2,16);},{passive:false});
 
